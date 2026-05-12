@@ -2,6 +2,7 @@ export const STORAGE_KEYS = {
   ENABLED: 'monitor_enabled',
   REQUEST_BUFFER: 'request_buffer',
   CAPTURE_FILTER: 'capture_filter',
+  DECRYPT_URL: 'decrypt_url',
 } as const;
 
 export const MESSAGE_TYPES = {

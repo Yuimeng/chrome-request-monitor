@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { RequestRecord } from "@request-monitor/shared";
+import { STORAGE_KEYS } from "@request-monitor/shared";
 import { useRequests } from "./hooks/useRequests";
 import { useFilter } from "./hooks/useFilter";
+import { useStorage } from "./hooks/useStorage";
 import Toolbar from "./components/Toolbar";
 import RequestTable from "./components/RequestTable";
 import RequestDetail from "./components/RequestDetail";
@@ -12,7 +14,7 @@ export default function App() {
   const { filteredRequests, filters, setFilters } = useFilter(requests);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showDecryptInput, setShowDecryptInput] = useState(false);
-  const [decryptUrl, setDecryptUrl] = useState('');
+  const [decryptUrl, setDecryptUrl] = useStorage(STORAGE_KEYS.DECRYPT_URL, '');
 
   const selectedRecord = selectedId
     ? requests.find((r) => r.id === selectedId)
