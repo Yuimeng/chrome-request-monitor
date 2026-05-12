@@ -6,11 +6,12 @@ import BodyTab from './BodyTab';
 
 interface RequestDetailProps {
   record: RequestRecord;
+  decryptUrl?: string;
 }
 
 const TABS = ['General', 'Request Headers', 'Response Headers', 'Request Body', 'Response Body'] as const;
 
-export default function RequestDetail({ record }: RequestDetailProps) {
+export default function RequestDetail({ record, decryptUrl }: RequestDetailProps) {
   const [activeTab, setActiveTab] = useState<string>('General');
 
   return (
@@ -39,8 +40,22 @@ export default function RequestDetail({ record }: RequestDetailProps) {
         {activeTab === 'General' && <GeneralTab record={record} />}
         {activeTab === 'Request Headers' && <HeadersTab headers={record.requestHeaders} title="Request Headers" />}
         {activeTab === 'Response Headers' && <HeadersTab headers={record.responseHeaders} title="Response Headers" />}
-        {activeTab === 'Request Body' && <BodyTab body={record.requestBody} label="Request Body" />}
-        {activeTab === 'Response Body' && <BodyTab body={record.responseBody} label="Response Body" />}
+        {activeTab === 'Request Body' && (
+          <BodyTab
+            body={record.requestBody}
+            label="Request Body"
+            decryptUrl={decryptUrl}
+            decryptPayload={{ requestBody: record.requestBody }}
+          />
+        )}
+        {activeTab === 'Response Body' && (
+          <BodyTab
+            body={record.responseBody}
+            label="Response Body"
+            decryptUrl={decryptUrl}
+            decryptPayload={{ requestBody: record.requestBody, responseBody: record.responseBody }}
+          />
+        )}
       </div>
     </div>
   );
