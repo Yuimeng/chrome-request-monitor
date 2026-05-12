@@ -19,6 +19,7 @@ export default function App() {
   const [count, setCount] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [draftFilter, setDraftFilter] = useState<CaptureFilter>(DEFAULT_FILTER);
+  const [decryptUrl, setDecryptUrl] = useStorage(STORAGE_KEYS.DECRYPT_URL, '');
 
   useEffect(() => {
     const updateCount = () => {
@@ -106,6 +107,26 @@ export default function App() {
             </div>
           </>
         )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid #eee', paddingTop: '8px' }}>
+          <label style={{ color: '#999', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Decrypt API URL
+          </label>
+          <input
+            type="text"
+            placeholder="http://localhost:3000/decrypt"
+            value={decryptUrl}
+            onChange={(e) => setDecryptUrl(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '5px 8px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
       </div>
     </div>
   );
