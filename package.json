@@ -1,0 +1,21 @@
+{
+  "name": "chrome-request-monitor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:content": "pnpm --filter @request-monitor/content build",
+    "build:background": "pnpm --filter @request-monitor/background build",
+    "build:popup": "pnpm --filter @request-monitor/popup build",
+    "build:devtool": "pnpm --filter @request-monitor/devtool build",
+    "build": "pnpm build:content && pnpm build:background && pnpm build:popup && pnpm build:devtool",
+    "assemble": "node scripts/assemble.cjs",
+    "build:ext": "pnpm build && pnpm assemble"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "pnpm": ">=9.0.0"
+  }
+}

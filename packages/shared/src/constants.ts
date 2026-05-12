@@ -1,0 +1,22 @@
+export const STORAGE_KEYS = {
+  ENABLED: 'monitor_enabled',
+  REQUEST_BUFFER: 'request_buffer',
+  CAPTURE_FILTER: 'capture_filter',
+} as const;
+
+export const MESSAGE_TYPES = {
+  REQUEST_CAPTURED: 'REQUEST_CAPTURED',
+  GET_CAPTURED_REQUESTS: 'GET_CAPTURED_REQUESTS',
+  CAPTURED_REQUESTS_RESPONSE: 'CAPTURED_REQUESTS_RESPONSE',
+  GET_REQUEST_COUNT: 'GET_REQUEST_COUNT',
+  REQUEST_COUNT_RESPONSE: 'REQUEST_COUNT_RESPONSE',
+} as const;
+
+export const EVENTS = {
+  REQUEST_CAPTURED: '__request_captured__',
+  MONITOR_CONFIG: '__monitor_config__',
+} as const;
+
+export const MAX_BODY_SIZE = 1_000_000; // 1MB
+
+export const PORT_NAME_DEVTOOLS = 'devtools';
