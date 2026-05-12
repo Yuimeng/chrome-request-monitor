@@ -18,6 +18,7 @@ export default function App() {
   const [filter, setFilter, filterLoading] = useStorage<CaptureFilter>(STORAGE_KEYS.CAPTURE_FILTER, DEFAULT_FILTER);
   const [count, setCount] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
+  const [draftFilter, setDraftFilter] = useState<CaptureFilter>(DEFAULT_FILTER);
 
   useEffect(() => {
     const updateCount = () => {
@@ -30,6 +31,10 @@ export default function App() {
     const interval = setInterval(updateCount, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (showFilters) setDraftFilter(filter);
+  }, [showFilters]);
 
   const hasActiveFilters = filter.urlPattern || !filter.captureFetch || !filter.captureXHR || filter.methods.length > 0;
 
@@ -66,7 +71,40 @@ export default function App() {
         </div>
         <StatusBadge enabled={enabled} count={count} />
         {showFilters && (
-          <FilterConfig filter={filter} onChange={setFilter} />
+          <>
+            <FilterConfig filter={draftFilter} onChange={setDraftFilter} />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setDraftFilter(filter); setShowFilters(false); }}
+                style={{
+                  padding: '6px 16px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  background: '#fff',
+                  color: '#666',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { setFilter(draftFilter); setShowFilters(false); }}
+                style={{
+                  padding: '6px 16px',
+                  border: '1px solid #4CAF50',
+                  borderRadius: '4px',
+                  background: '#4CAF50',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                确定
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>
