@@ -11,6 +11,19 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl }: Bod
   const [decrypted, setDecrypted] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
   const [decryptError, setDecryptError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    const text = decrypted ?? body;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard not available
+    }
+  };
 
   const handleDecrypt = async () => {
     if (!decryptUrl || !decryptPayload) return;
@@ -51,8 +64,22 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl }: Bod
 
   return (
     <div>
-      {decryptUrl && decryptPayload && (
-        <div style={{ padding: '8px 12px 0', display: 'flex', gap: '6px', alignItems: 'center' }}>
+      <div style={{ padding: '8px 12px 0', display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <button
+          onClick={handleCopy}
+          style={{
+            padding: '3px 10px',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            background: copied ? '#e8f5e9' : '#fff',
+            color: copied ? '#2e7d32' : '#666',
+            fontSize: '11px',
+            cursor: 'pointer',
+          }}
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+        {decryptUrl && decryptPayload && (
           <button
             onClick={handleDecrypt}
             disabled={decrypting}
@@ -69,27 +96,27 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl }: Bod
           >
             {decrypting ? 'Decrypting...' : 'Decrypt'}
           </button>
-          {decrypted && (
-            <button
-              onClick={() => { setDecrypted(null); setDecryptError(null); }}
-              style={{
-                padding: '3px 10px',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                background: '#fff',
-                color: '#666',
-                fontSize: '11px',
-                cursor: 'pointer',
-              }}
-            >
-              Original
-            </button>
-          )}
-          {decryptError && (
-            <span style={{ color: '#d32f2f', fontSize: '11px' }}>{decryptError}</span>
-          )}
-        </div>
-      )}
+        )}
+        {decryptUrl && decryptPayload && decrypted && (
+          <button
+            onClick={() => { setDecrypted(null); setDecryptError(null); }}
+            style={{
+              padding: '3px 10px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              background: '#fff',
+              color: '#666',
+              fontSize: '11px',
+              cursor: 'pointer',
+            }}
+          >
+            Original
+          </button>
+        )}
+        {decryptError && (
+          <span style={{ color: '#d32f2f', fontSize: '11px' }}>{decryptError}</span>
+        )}
+      </div>
       <pre style={{
         margin: 0,
         padding: '12px',
