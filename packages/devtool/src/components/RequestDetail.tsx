@@ -12,7 +12,7 @@ interface RequestDetailProps {
 const TABS = ['General', 'Request Headers', 'Response Headers', 'Request Body', 'Response Body'] as const;
 
 export default function RequestDetail({ record, decryptUrl }: RequestDetailProps) {
-  const [activeTab, setActiveTab] = useState<string>('General');
+  const [activeTab, setActiveTab] = useState<string>('Request Body');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>

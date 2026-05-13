@@ -66,8 +66,8 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl }: Bod
   }
 
   return (
-    <div>
-      <div style={{ padding: '8px 12px 0', display: 'flex', gap: '6px', alignItems: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ padding: '8px 12px', display: 'flex', gap: '6px', alignItems: 'center' }}>
         <button
           onClick={handleCopy}
           style={{
@@ -82,7 +82,7 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl }: Bod
         >
           {copied ? 'Copied!' : 'Copy'}
         </button>
-        {decryptUrl && decryptPayload && (
+        {decryptUrl && !!decryptPayload && (
           <button
             onClick={handleDecrypt}
             disabled={decrypting}
@@ -100,7 +100,7 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl }: Bod
             {decrypting ? 'Decrypting...' : 'Decrypt'}
           </button>
         )}
-        {decryptUrl && decryptPayload && decrypted && (
+        {decryptUrl && !!decryptPayload && decrypted && (
           <button
             onClick={() => { setDecrypted(null); setDecryptError(null); }}
             style={{
@@ -127,10 +127,10 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl }: Bod
         fontFamily: 'monospace',
         color: '#333',
         overflow: 'auto',
-        maxHeight: '300px',
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-all',
         background: decrypted ? '#fffde7' : '#fafafa',
+        flex: 1,
       }}>
         {formatted}
       </pre>
