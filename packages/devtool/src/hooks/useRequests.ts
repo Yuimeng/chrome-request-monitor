@@ -7,25 +7,39 @@ export function useRequests() {
   const portRef = useRef<chrome.runtime.Port | null>(null);
 
   useEffect(() => {
-    const port = chrome.runtime.connect({ name: PORT_NAME_DEVTOOLS });
-    portRef.current = port;
+    let disconnected = false;
 
-    port.onMessage.addListener((message: any) => {
-      switch (message.type) {
-        case MESSAGE_TYPES.CAPTURED_REQUESTS_RESPONSE:
-          setRequests(message.data as RequestRecord[]);
-          break;
-        case MESSAGE_TYPES.REQUEST_CAPTURED:
-          setRequests(prev => [...prev, message.data as RequestRecord]);
-          break;
-        case MESSAGE_TYPES.CLEAR_REQUESTS:
-          setRequests([]);
-          break;
-      }
-    });
+    function connect() {
+      if (disconnected) return;
+      const port = chrome.runtime.connect({ name: PORT_NAME_DEVTOOLS });
+      portRef.current = port;
+
+      port.onMessage.addListener((message: any) => {
+        switch (message.type) {
+          case MESSAGE_TYPES.CAPTURED_REQUESTS_RESPONSE:
+            setRequests(message.data as RequestRecord[]);
+            break;
+          case MESSAGE_TYPES.REQUEST_CAPTURED:
+            setRequests(prev => [...prev, message.data as RequestRecord]);
+            break;
+          case MESSAGE_TYPES.CLEAR_REQUESTS:
+            setRequests([]);
+            break;
+        }
+      });
+
+      port.onDisconnect.addListener(() => {
+        portRef.current = null;
+        // Service worker terminated — reconnect after a brief delay
+        setTimeout(connect, 500);
+      });
+    }
+
+    connect();
 
     return () => {
-      port.disconnect();
+      disconnected = true;
+      portRef.current?.disconnect();
       portRef.current = null;
     };
   }, []);
