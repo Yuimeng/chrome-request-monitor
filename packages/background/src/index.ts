@@ -1,5 +1,5 @@
 import { MESSAGE_TYPES, PORT_NAME_DEVTOOLS, STORAGE_KEYS } from '@request-monitor/shared';
-import type { RequestRecord } from '@request-monitor/shared';
+import type { RequestRecord, DecryptPayload } from '@request-monitor/shared';
 
 const requestBuffer: RequestRecord[] = [];
 const devtoolsPorts: Set<chrome.runtime.Port> = new Set();
@@ -33,6 +33,27 @@ async function restoreBuffer() {
   }
 }
 
+async function handleDecrypt(payload: DecryptPayload): Promise<{ success: boolean; data?: string; error?: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), payload.timeoutMs);
+
+  try {
+    const res = await fetch(payload.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...payload.headers },
+      body: JSON.stringify(payload.body),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    return { success: true, data: text };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Decrypt failed' };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 chrome.runtime.onMessage.addListener((
   message: any,
   _sender: chrome.runtime.MessageSender,
@@ -53,6 +74,12 @@ chrome.runtime.onMessage.addListener((
     case MESSAGE_TYPES.GET_REQUEST_COUNT: {
       sendResponse({ type: MESSAGE_TYPES.REQUEST_COUNT_RESPONSE, count: requestBuffer.length });
       break;
+    }
+    case MESSAGE_TYPES.DECRYPT_REQUEST: {
+      handleDecrypt(message.payload as DecryptPayload).then((result) => {
+        sendResponse({ type: MESSAGE_TYPES.DECRYPT_RESPONSE, ...result });
+      });
+      return true; // keep channel open for async response
     }
   }
   return true;

@@ -13,14 +13,12 @@ export default function App() {
   const { requests, clearRequests } = useRequests();
   const { filteredRequests, filters, setFilters } = useFilter(requests);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [decryptUrl] = useStorage(STORAGE_KEYS.DECRYPT_URL, '');
+  const [decryptUrl] = useStorage(STORAGE_KEYS.DECRYPT_URL, "");
 
-  const selectedRecord = selectedId
-    ? requests.find((r) => r.id === selectedId)
-    : null;
+  const selectedRecord = selectedId ? requests.find((r) => r.id === selectedId) : null;
 
   const handleSelect = (record: RequestRecord) => {
-    setSelectedId(record.id);
+    setSelectedId(selectedId === record.id ? "" : record.id);
   };
 
   return (
@@ -32,17 +30,9 @@ export default function App() {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <Toolbar
-        filters={filters}
-        onFilterChange={setFilters}
-        onClear={clearRequests}
-      />
+      <Toolbar filters={filters} onFilterChange={setFilters} onClear={clearRequests} />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <RequestTable
-          requests={filteredRequests}
-          selectedId={selectedId}
-          onSelect={handleSelect}
-        />
+        <RequestTable requests={filteredRequests} selectedId={selectedId} onSelect={handleSelect} />
         {selectedRecord && (
           <div
             style={{

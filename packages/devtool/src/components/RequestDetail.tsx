@@ -4,15 +4,29 @@ import GeneralTab from './GeneralTab';
 import HeadersTab from './HeadersTab';
 import BodyTab from './BodyTab';
 
+
 interface RequestDetailProps {
   record: RequestRecord;
   decryptUrl?: string;
 }
 
-const TABS = ['General', 'Request Headers', 'Response Headers', 'Request Body', 'Response Body'] as const;
+const TABS = [
+  "Request Body",
+  "Response Body",
+  "General",
+  "Request Headers",
+  "Response Headers",
+] as const;
 
 export default function RequestDetail({ record, decryptUrl }: RequestDetailProps) {
-  const [activeTab, setActiveTab] = useState<string>('Request Body');
+  const [activeTab, setActiveTab] = useState<string>("Request Body");
+  let requestBody, responseBody;
+  try {
+    requestBody = record.requestBody ? JSON.parse(record.requestBody) : {};
+    responseBody = record.responseBody ? JSON.parse(record.responseBody) : {};
+  } catch {
+    //
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
@@ -45,7 +59,7 @@ export default function RequestDetail({ record, decryptUrl }: RequestDetailProps
             body={record.requestBody}
             label="Request Body"
             decryptUrl={decryptUrl}
-            decryptPayload={{ requestBody: record.requestBody }}
+            decryptPayload={requestBody}
           />
         )}
         {activeTab === 'Response Body' && (
@@ -53,7 +67,7 @@ export default function RequestDetail({ record, decryptUrl }: RequestDetailProps
             body={record.responseBody}
             label="Response Body"
             decryptUrl={decryptUrl}
-            decryptPayload={{ requestBody: record.requestBody, responseBody: record.responseBody }}
+            decryptPayload={{ ...responseBody, key: requestBody.key }}
           />
         )}
       </div>
