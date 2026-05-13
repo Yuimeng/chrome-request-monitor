@@ -8,23 +8,38 @@ const DEFAULT_FILTER: CaptureFilter = {
   methods: [],
 };
 
-function sendConfig() {
+let savedConfig: { enabled: boolean; filter: CaptureFilter } | null = null;
+let mainScriptLoaded = false;
+
+function dispatchConfig() {
+  if (!savedConfig || !mainScriptLoaded) return;
+  window.dispatchEvent(new CustomEvent(EVENTS.MONITOR_CONFIG, {
+    detail: savedConfig,
+  }));
+}
+
+function loadConfig() {
   chrome.storage.sync.get([STORAGE_KEYS.ENABLED, STORAGE_KEYS.CAPTURE_FILTER], (result) => {
     const enabled = result[STORAGE_KEYS.ENABLED] ?? false;
     const filter: CaptureFilter = { ...DEFAULT_FILTER, ...(result[STORAGE_KEYS.CAPTURE_FILTER] ?? {}) };
-    window.dispatchEvent(new CustomEvent(EVENTS.MONITOR_CONFIG, {
-      detail: { enabled, filter },
-    }));
+    savedConfig = { enabled, filter };
+    dispatchConfig();
   });
 }
 
-const script = document.createElement('script');
-script.src = chrome.runtime.getURL('content/main.js');
-script.onload = () => {
-  script.remove();
-  sendConfig();
-};
-document.documentElement.appendChild(script);
+function injectMainScript() {
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('content/main.js');
+  script.onload = () => {
+    script.remove();
+    mainScriptLoaded = true;
+    dispatchConfig();
+  };
+  (document.documentElement || document.head || document).appendChild(script);
+}
+
+loadConfig();
+injectMainScript();
 
 window.addEventListener(EVENTS.REQUEST_CAPTURED, ((event: CustomEvent) => {
   chrome.runtime.sendMessage({
