@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface BodyTabProps {
   body: string | undefined;
@@ -52,6 +52,12 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl }: Bod
       setDecrypting(false);
     }
   };
+
+  useEffect(() => {
+    if (decryptUrl && decryptPayload) {
+      handleDecrypt();
+    }
+  }, []); // key prop on BodyTab ensures re-mount on record change, so no deps needed
 
   const content = decrypted ?? body;
 
