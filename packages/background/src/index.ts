@@ -81,6 +81,19 @@ chrome.runtime.onMessage.addListener((
       });
       return true; // keep channel open for async response
     }
+    case MESSAGE_TYPES.CLEAR_REQUESTS: {
+      requestBuffer.length = 0;
+      persistBuffer();
+      for (const port of devtoolsPorts) {
+        try {
+          port.postMessage({ type: MESSAGE_TYPES.CLEAR_REQUESTS });
+        } catch {
+          devtoolsPorts.delete(port);
+        }
+      }
+      sendResponse({ ok: true });
+      break;
+    }
   }
   return true;
 });

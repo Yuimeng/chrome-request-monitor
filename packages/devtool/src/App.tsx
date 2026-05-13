@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { RequestRecord } from "@request-monitor/shared";
-import { STORAGE_KEYS } from "@request-monitor/shared";
+import { MESSAGE_TYPES, STORAGE_KEYS } from "@request-monitor/shared";
 import { useRequests } from "./hooks/useRequests";
 import { useFilter } from "./hooks/useFilter";
 import { useStorage } from "./hooks/useStorage";
@@ -21,6 +21,11 @@ export default function App() {
     setSelectedId(selectedId === record.id ? "" : record.id);
   };
 
+  const handleClear = () => {
+    chrome.runtime.sendMessage({ type: MESSAGE_TYPES.CLEAR_REQUESTS });
+    clearRequests();
+  };
+
   return (
     <div
       style={{
@@ -30,7 +35,7 @@ export default function App() {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <Toolbar filters={filters} onFilterChange={setFilters} onClear={clearRequests} />
+      <Toolbar filters={filters} onFilterChange={setFilters} onClear={handleClear} />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <RequestTable requests={filteredRequests} selectedId={selectedId} onSelect={handleSelect} />
         {selectedRecord && (

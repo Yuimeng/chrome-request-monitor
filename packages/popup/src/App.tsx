@@ -71,6 +71,24 @@ export default function App() {
           </button>
         </div>
         <StatusBadge enabled={enabled} count={count} />
+        <button
+          onClick={() => {
+            chrome.runtime.sendMessage({ type: MESSAGE_TYPES.CLEAR_REQUESTS });
+            setCount(0);
+          }}
+          disabled={count === 0}
+          style={{
+            padding: '4px 8px',
+            border: `1px solid ${count > 0 ? '#e57373' : '#ddd'}`,
+            borderRadius: '4px',
+            background: count > 0 ? '#fff' : '#f5f5f5',
+            color: count > 0 ? '#d32f2f' : '#bbb',
+            fontSize: '11px',
+            cursor: count > 0 ? 'pointer' : 'not-allowed',
+          }}
+        >
+          Clear
+        </button>
         {showFilters && (
           <>
             <FilterConfig filter={draftFilter} onChange={setDraftFilter} />

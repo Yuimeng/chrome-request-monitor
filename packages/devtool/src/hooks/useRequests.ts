@@ -18,6 +18,9 @@ export function useRequests() {
         case MESSAGE_TYPES.REQUEST_CAPTURED:
           setRequests(prev => [...prev, message.data as RequestRecord]);
           break;
+        case MESSAGE_TYPES.CLEAR_REQUESTS:
+          setRequests([]);
+          break;
       }
     });
 
