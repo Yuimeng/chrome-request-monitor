@@ -56,6 +56,7 @@ export default function RequestDetail({ record, decryptUrl }: RequestDetailProps
         {activeTab === 'Response Headers' && <HeadersTab headers={record.responseHeaders} title="Response Headers" />}
         {activeTab === 'Request Body' && (
           <BodyTab
+            key={record.id + '-request'}
             body={record.requestBody}
             label="Request Body"
             decryptUrl={decryptUrl}
@@ -64,6 +65,7 @@ export default function RequestDetail({ record, decryptUrl }: RequestDetailProps
         )}
         {activeTab === 'Response Body' && (
           <BodyTab
+            key={record.id + '-response'}
             body={record.responseBody}
             label="Response Body"
             decryptUrl={decryptUrl}
