@@ -1,7 +1,8 @@
 import { EVENTS, MAX_BODY_SIZE } from "@request-monitor/shared";
 import type { CaptureFilter } from "@request-monitor/shared";
 
-let active = false;
+let fetchActive = false;
+let xhrActive = false;
 let currentFilter: CaptureFilter = { urlPattern: "", captureFetch: true, captureXHR: true, methods: [] };
 let originalFetch: typeof window.fetch;
 let originalXHR: typeof window.XMLHttpRequest;
@@ -19,8 +20,8 @@ function generateId(): string {
 }
 
 function patchFetch() {
-  if (active) return;
-  active = true;
+  if (fetchActive) return;
+  fetchActive = true;
   originalFetch = window.fetch.bind(window);
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -122,8 +123,8 @@ function patchFetch() {
 }
 
 function patchXHR() {
-  if (active) return;
-  active = true;
+  if (xhrActive) return;
+  xhrActive = true;
   originalXHR = window.XMLHttpRequest;
 
   const OriginalXHR = originalXHR;
@@ -213,10 +214,14 @@ function patchXHR() {
 }
 
 function restore() {
-  if (!active) return;
-  if (originalFetch) window.fetch = originalFetch;
-  if (originalXHR) window.XMLHttpRequest = originalXHR;
-  active = false;
+  if (fetchActive && originalFetch) {
+    window.fetch = originalFetch;
+    fetchActive = false;
+  }
+  if (xhrActive && originalXHR) {
+    window.XMLHttpRequest = originalXHR;
+    xhrActive = false;
+  }
 }
 
 window.addEventListener(EVENTS.MONITOR_CONFIG, ((event: CustomEvent) => {
