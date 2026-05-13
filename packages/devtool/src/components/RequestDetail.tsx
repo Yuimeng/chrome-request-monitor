@@ -10,6 +10,14 @@ interface RequestDetailProps {
   decryptUrl?: string;
 }
 
+function extractQueryKey(url: string): string | undefined {
+  try {
+    return new URL(url).searchParams.get('key') || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const TABS = [
   "Request Body",
   "Response Body",
@@ -69,7 +77,7 @@ export default function RequestDetail({ record, decryptUrl }: RequestDetailProps
             body={record.responseBody}
             label="Response Body"
             decryptUrl={decryptUrl}
-            decryptPayload={{ ...responseBody, key: requestBody.key }}
+            decryptPayload={{ ...responseBody, key: requestBody.key || extractQueryKey(record.url) }}
           />
         )}
       </div>
