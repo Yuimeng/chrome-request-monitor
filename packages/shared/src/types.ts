@@ -38,7 +38,8 @@ export type Message =
   | { type: 'REQUEST_COUNT_RESPONSE'; count: number }
   | { type: 'DECRYPT_REQUEST'; payload: DecryptPayload }
   | { type: 'DECRYPT_RESPONSE'; success: boolean; data?: string; error?: string }
-  | { type: 'CLEAR_REQUESTS' };
+  | { type: 'CLEAR_REQUESTS' }
+  | { type: 'IMPORT_REQUESTS'; data: RequestRecord[] };
 
 export interface DecryptPayload {
   url: string;

@@ -85,6 +85,12 @@ chrome.runtime.onMessage.addListener((
         });
       return true;
     }
+    case MESSAGE_TYPES.IMPORT_REQUESTS: {
+      const records = message.data as RequestRecord[];
+      requestBuffer.push(...records);
+      persistBuffer();
+      break;
+    }
     case MESSAGE_TYPES.CLEAR_REQUESTS: {
       requestBuffer.length = 0;
       persistBuffer();

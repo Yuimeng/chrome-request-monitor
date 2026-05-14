@@ -50,6 +50,7 @@ export function useRequests() {
 
   const importRequests = useCallback((records: RequestRecord[]) => {
     setRequests(prev => [...records, ...prev]);
+    chrome.runtime.sendMessage({ type: MESSAGE_TYPES.IMPORT_REQUESTS, data: records });
   }, []);
 
   return { requests, clearRequests, importRequests };
