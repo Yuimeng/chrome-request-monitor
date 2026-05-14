@@ -48,5 +48,9 @@ export function useRequests() {
     setRequests([]);
   }, []);
 
-  return { requests, clearRequests };
+  const importRequests = useCallback((records: RequestRecord[]) => {
+    setRequests(prev => [...records, ...prev]);
+  }, []);
+
+  return { requests, clearRequests, importRequests };
 }

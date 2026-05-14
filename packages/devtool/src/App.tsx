@@ -10,7 +10,7 @@ import RequestDetail from "./components/RequestDetail";
 import StatusBar from "./components/StatusBar";
 
 export default function App() {
-  const { requests, clearRequests } = useRequests();
+  const { requests, clearRequests, importRequests } = useRequests();
   const { filteredRequests, filters, setFilters } = useFilter(requests);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [decryptUrl] = useStorage(STORAGE_KEYS.DECRYPT_URL, "");
@@ -35,7 +35,7 @@ export default function App() {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <Toolbar filters={filters} onFilterChange={setFilters} onClear={handleClear} />
+      <Toolbar filters={filters} onFilterChange={setFilters} onClear={handleClear} onImport={importRequests} />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <RequestTable requests={filteredRequests} selectedId={selectedId} onSelect={handleSelect} />
         {selectedRecord && (

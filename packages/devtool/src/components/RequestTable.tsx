@@ -61,7 +61,7 @@ export default function RequestTable({ requests, selectedId, onSelect }: Request
                 {req.responseStatus || 'ERR'}
               </span>
               <span style={{ width: '36px', textAlign: 'right', color: '#666', flexShrink: 0 }}>
-                {req.type === 'fetch' ? 'FETCH' : 'XHR'}
+                {req.type === 'fetch' ? 'FETCH' : req.type === 'har' ? 'HAR' : 'XHR'}
               </span>
               <span style={{ width: '60px', textAlign: 'right', color: getDurationColor(req.duration), flexShrink: 0 }}>
                 {formatDuration(req.duration)}

@@ -1,7 +1,7 @@
 export const FILTER_OPTIONS = {
   method: ['', 'GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'],
   status: ['', '2xx', '3xx', '4xx', '5xx'],
-  type: ['', 'fetch', 'xhr'],
+  type: ['', 'fetch', 'xhr', 'har'],
 } as const;
 
 export const LABELS: Record<string, string> = {
@@ -18,4 +18,5 @@ export const LABELS: Record<string, string> = {
   '5xx': '5xx',
   'fetch': 'fetch',
   'xhr': 'xhr',
+  'har': 'HAR',
 };

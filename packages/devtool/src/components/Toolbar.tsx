@@ -1,15 +1,44 @@
+import { useRef } from 'react';
 import { FILTER_OPTIONS, LABELS } from '../utils/constants';
-import type { FilterConfig } from '@request-monitor/shared';
+import { parseHar } from '../utils/har';
+import type { FilterConfig, RequestRecord } from '@request-monitor/shared';
 
 interface ToolbarProps {
   filters: FilterConfig;
   onFilterChange: (filters: FilterConfig) => void;
   onClear: () => void;
+  onImport: (records: RequestRecord[]) => void;
 }
 
-export default function Toolbar({ filters, onFilterChange, onClear }: ToolbarProps) {
+export default function Toolbar({ filters, onFilterChange, onClear, onImport }: ToolbarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const update = (partial: Partial<FilterConfig>) => {
     onFilterChange({ ...filters, ...partial });
+  };
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const records = parseHar(text);
+        onImport(records);
+      } catch (err) {
+        alert('Import failed: ' + (err instanceof Error ? err.message : 'Invalid file'));
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset so the same file can be re-imported
+    e.target.value = '';
   };
 
   return (
@@ -22,6 +51,13 @@ export default function Toolbar({ filters, onFilterChange, onClear }: ToolbarPro
       background: '#fafafa',
       flexWrap: 'wrap',
     }}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".har,application/json"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
       <input
         type="text"
         placeholder="Filter URL..."
@@ -90,6 +126,16 @@ export default function Toolbar({ filters, onFilterChange, onClear }: ToolbarPro
         cursor: 'pointer',
       }}>
         Clear
+      </button>
+      <button onClick={handleImport} style={{
+        padding: '4px 12px',
+        border: '1px solid #ccc',
+        borderRadius: '4px',
+        fontSize: '12px',
+        background: '#e3f2fd',
+        cursor: 'pointer',
+      }}>
+        Import HAR
       </button>
     </div>
   );

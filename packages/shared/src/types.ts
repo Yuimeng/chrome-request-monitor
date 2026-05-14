@@ -9,7 +9,7 @@ export interface RequestRecord {
   responseBody?: string;
   startTime: number;
   duration: number;
-  type: 'fetch' | 'xhr';
+  type: 'fetch' | 'xhr' | 'har';
 }
 
 export interface FilterConfig {
