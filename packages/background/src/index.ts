@@ -67,6 +67,16 @@ chrome.runtime.onMessage.addListener((
       persistBuffer();
       break;
     }
+    case MESSAGE_TYPES.REQUESTS_BATCH: {
+      const records = message.data as RequestRecord[];
+      for (const record of records) {
+        requestBuffer.push(record);
+        broadcastToDevTools(record);
+      }
+      persistBuffer();
+      sendResponse({ ok: true });
+      break;
+    }
     case MESSAGE_TYPES.GET_CAPTURED_REQUESTS: {
       sendResponse({ type: MESSAGE_TYPES.CAPTURED_REQUESTS_RESPONSE, data: requestBuffer });
       break;
