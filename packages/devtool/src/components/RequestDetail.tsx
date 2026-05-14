@@ -16,7 +16,12 @@ function extractQueryKey(url: string): string | undefined {
   try {
     return new URL(url).searchParams.get('key') || undefined;
   } catch {
-    return undefined;
+    // url may be a path without domain
+    try {
+      return new URL(url, 'http://localhost').searchParams.get('key') || undefined;
+    } catch {
+      return undefined;
+    }
   }
 }
 
