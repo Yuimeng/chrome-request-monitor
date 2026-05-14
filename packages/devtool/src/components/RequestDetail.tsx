@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { RequestRecord } from '@request-monitor/shared';
+import { STORAGE_KEYS } from '@request-monitor/shared';
+import { useStorage } from '../hooks/useStorage';
 import GeneralTab from './GeneralTab';
 import HeadersTab from './HeadersTab';
 import BodyTab from './BodyTab';
@@ -28,6 +30,7 @@ const TABS = [
 
 export default function RequestDetail({ record, decryptUrl }: RequestDetailProps) {
   const [activeTab, setActiveTab] = useState<string>("Request Body");
+  const [autoDecrypt] = useStorage(STORAGE_KEYS.AUTO_DECRYPT, true);
   let requestBody, responseBody;
   try {
     requestBody = record.requestBody ? JSON.parse(record.requestBody) : {};
@@ -69,6 +72,7 @@ export default function RequestDetail({ record, decryptUrl }: RequestDetailProps
             label="Request Body"
             decryptUrl={decryptUrl}
             decryptPayload={requestBody}
+            autoDecrypt={autoDecrypt}
           />
         )}
         {activeTab === 'Response Body' && (
@@ -78,6 +82,7 @@ export default function RequestDetail({ record, decryptUrl }: RequestDetailProps
             label="Response Body"
             decryptUrl={decryptUrl}
             decryptPayload={{ ...responseBody, key: requestBody.key || extractQueryKey(record.url) }}
+            autoDecrypt={autoDecrypt}
           />
         )}
       </div>

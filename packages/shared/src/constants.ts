@@ -3,6 +3,7 @@ export const STORAGE_KEYS = {
   REQUEST_BUFFER: 'request_buffer',
   CAPTURE_FILTER: 'capture_filter',
   DECRYPT_URL: 'decrypt_url',
+  AUTO_DECRYPT: 'auto_decrypt',
 } as const;
 
 export const MESSAGE_TYPES = {

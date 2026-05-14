@@ -20,6 +20,7 @@ export default function App() {
   const [showFilters, setShowFilters] = useState(false);
   const [draftFilter, setDraftFilter] = useState<CaptureFilter>(DEFAULT_FILTER);
   const [decryptUrl, setDecryptUrl] = useStorage(STORAGE_KEYS.DECRYPT_URL, '');
+  const [autoDecrypt, setAutoDecrypt] = useStorage(STORAGE_KEYS.AUTO_DECRYPT, true);
 
   useEffect(() => {
     const updateCount = () => {
@@ -126,6 +127,37 @@ export default function App() {
           </>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid #eee', paddingTop: '8px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+            <span style={{ color: '#999', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Auto Decrypt
+            </span>
+            <div
+              onClick={() => setAutoDecrypt(!autoDecrypt)}
+              style={{
+                width: '36px',
+                height: '20px',
+                borderRadius: '10px',
+                background: autoDecrypt ? '#4CAF50' : '#ccc',
+                position: 'relative',
+                transition: 'background 0.2s',
+                cursor: 'pointer',
+              }}
+            >
+              <div
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  background: '#fff',
+                  position: 'absolute',
+                  top: '2px',
+                  left: autoDecrypt ? '18px' : '2px',
+                  transition: 'left 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }}
+              />
+            </div>
+          </label>
           <label style={{ color: '#999', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Decrypt API URL
           </label>

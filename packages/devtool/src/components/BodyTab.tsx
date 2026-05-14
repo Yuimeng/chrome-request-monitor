@@ -5,9 +5,10 @@ interface BodyTabProps {
   label: string;
   decryptPayload?: unknown;
   decryptUrl?: string;
+  autoDecrypt?: boolean;
 }
 
-export default function BodyTab({ body, label, decryptPayload, decryptUrl }: BodyTabProps) {
+export default function BodyTab({ body, label, decryptPayload, decryptUrl, autoDecrypt }: BodyTabProps) {
   const [decrypted, setDecrypted] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
   const [decryptError, setDecryptError] = useState<string | null>(null);
@@ -54,7 +55,7 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl }: Bod
   };
 
   useEffect(() => {
-    if (decryptUrl && decryptPayload) {
+    if (autoDecrypt !== false && decryptUrl && decryptPayload) {
       handleDecrypt();
     }
   }, []); // key prop on BodyTab ensures re-mount on record change, so no deps needed
