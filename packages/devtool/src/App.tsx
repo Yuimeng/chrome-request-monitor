@@ -17,6 +17,34 @@ export default function App() {
   const [decryptUrl] = useStorage(STORAGE_KEYS.DECRYPT_URL, "");
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounter = useRef(0);
+  const [detailWidth, setDetailWidth] = useState(500);
+  const isResizing = useRef(false);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    const startX = e.clientX;
+    const startW = detailWidth;
+
+    const handleMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      const newWidth = Math.max(300, Math.min(800, startW + (startX - e.clientX)));
+      setDetailWidth(newWidth);
+    };
+
+    const handleUp = () => {
+      isResizing.current = false;
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [detailWidth]);
 
   const selectedRecord = selectedId ? requests.find((r) => r.id === selectedId) : null;
 
@@ -92,16 +120,27 @@ export default function App() {
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <RequestTable requests={filteredRequests} selectedId={selectedId} onSelect={handleSelect} />
         {selectedRecord && (
-          <div
-            style={{
-              minWidth: "400px",
-              borderLeft: "1px solid #ddd",
-              overflow: "auto",
-              flex: 2,
-            }}
-          >
-            <RequestDetail record={selectedRecord} decryptUrl={decryptUrl} onClose={() => setSelectedId(null)} />
-          </div>
+          <>
+            <div
+              onMouseDown={handleResizeStart}
+              style={{
+                width: "5px",
+                cursor: "col-resize",
+                flexShrink: 0,
+                background: "transparent",
+              }}
+            />
+            <div
+              style={{
+                width: detailWidth,
+                flex: "none",
+                borderLeft: "1px solid #ddd",
+                overflow: "auto",
+              }}
+            >
+              <RequestDetail record={selectedRecord} decryptUrl={decryptUrl} onClose={() => setSelectedId(null)} />
+            </div>
+          </>
         )}
       </div>
       <StatusBar total={requests.length} filtered={filteredRequests.length} />
