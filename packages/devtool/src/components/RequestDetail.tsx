@@ -25,6 +25,24 @@ function extractQueryKey(url: string): string | undefined {
   }
 }
 
+function parseUrlParams(url: string): Record<string, string> {
+  try {
+    const params = new URL(url).searchParams;
+    const obj: Record<string, string> = {};
+    params.forEach((v, k) => { obj[k] = v; });
+    return obj;
+  } catch {
+    try {
+      const params = new URL(url, 'http://localhost').searchParams;
+      const obj: Record<string, string> = {};
+      params.forEach((v, k) => { obj[k] = v; });
+      return obj;
+    } catch {
+      return {};
+    }
+  }
+}
+
 const TABS = [
   "Request Body",
   "Response Body",
@@ -38,7 +56,7 @@ export default function RequestDetail({ record, decryptUrl }: RequestDetailProps
   const [autoDecrypt] = useStorage(STORAGE_KEYS.AUTO_DECRYPT, true);
   let requestBody, responseBody;
   try {
-    requestBody = record.requestBody ? JSON.parse(record.requestBody) : {};
+    requestBody = record.requestBody ? JSON.parse(record.requestBody) : parseUrlParams(record.url);
     responseBody = record.responseBody ? JSON.parse(record.responseBody) : {};
   } catch {
     //
