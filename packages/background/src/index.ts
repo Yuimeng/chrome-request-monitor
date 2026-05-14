@@ -75,15 +75,15 @@ chrome.runtime.onMessage.addListener((
       }
       persistBuffer();
       sendResponse({ ok: true });
-      break;
+      return true;
     }
     case MESSAGE_TYPES.GET_CAPTURED_REQUESTS: {
       sendResponse({ type: MESSAGE_TYPES.CAPTURED_REQUESTS_RESPONSE, data: requestBuffer });
-      break;
+      return true;
     }
     case MESSAGE_TYPES.GET_REQUEST_COUNT: {
       sendResponse({ type: MESSAGE_TYPES.REQUEST_COUNT_RESPONSE, count: requestBuffer.length });
-      break;
+      return true;
     }
     case MESSAGE_TYPES.DECRYPT_REQUEST: {
       handleDecrypt(message.payload as DecryptPayload)
@@ -112,7 +112,7 @@ chrome.runtime.onMessage.addListener((
         }
       }
       sendResponse({ ok: true });
-      break;
+      return true;
     }
   }
 });
