@@ -76,10 +76,14 @@ chrome.runtime.onMessage.addListener((
       break;
     }
     case MESSAGE_TYPES.DECRYPT_REQUEST: {
-      handleDecrypt(message.payload as DecryptPayload).then((result) => {
-        sendResponse({ type: MESSAGE_TYPES.DECRYPT_RESPONSE, ...result });
-      });
-      return true; // keep channel open for async response
+      handleDecrypt(message.payload as DecryptPayload)
+        .then((result) => {
+          sendResponse({ type: MESSAGE_TYPES.DECRYPT_RESPONSE, ...result });
+        })
+        .catch((err) => {
+          sendResponse({ type: MESSAGE_TYPES.DECRYPT_RESPONSE, success: false, error: err instanceof Error ? err.message : 'Decrypt failed' });
+        });
+      return true;
     }
     case MESSAGE_TYPES.CLEAR_REQUESTS: {
       requestBuffer.length = 0;
@@ -95,7 +99,6 @@ chrome.runtime.onMessage.addListener((
       break;
     }
   }
-  return true;
 });
 
 chrome.runtime.onConnect.addListener((port) => {
