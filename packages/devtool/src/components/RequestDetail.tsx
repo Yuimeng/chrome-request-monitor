@@ -10,6 +10,7 @@ import BodyTab from './BodyTab';
 interface RequestDetailProps {
   record: RequestRecord;
   decryptUrl?: string;
+  onClose?: () => void;
 }
 
 function extractQueryKey(url: string): string | undefined {
@@ -51,7 +52,7 @@ const TABS = [
   "Response Headers",
 ] as const;
 
-export default function RequestDetail({ record, decryptUrl }: RequestDetailProps) {
+export default function RequestDetail({ record, decryptUrl, onClose }: RequestDetailProps) {
   const [activeTab, setActiveTab] = useState<string>("Request Body");
   const [autoDecrypt] = useStorage(STORAGE_KEYS.AUTO_DECRYPT, true);
   let requestBody, responseBody;
@@ -64,7 +65,7 @@ export default function RequestDetail({ record, decryptUrl }: RequestDetailProps
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
-      <div style={{ display: 'flex', borderBottom: '1px solid #ddd', background: '#fafafa' }}>
+      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #ddd', background: '#fafafa' }}>
         {TABS.map((tab) => (
           <button
             key={tab}
@@ -83,6 +84,26 @@ export default function RequestDetail({ record, decryptUrl }: RequestDetailProps
             {tab}
           </button>
         ))}
+        <div style={{ flex: 1 }} />
+        {onClose && (
+          <button
+            onClick={onClose}
+            title="Close"
+            style={{
+              marginRight: '8px',
+              padding: '2px 8px',
+              border: 'none',
+              borderRadius: '4px',
+              background: 'transparent',
+              cursor: 'pointer',
+              fontSize: '24px',
+              color: '#999',
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        )}
       </div>
       <div style={{ flex: 1, overflow: 'auto' }}>
         {activeTab === 'General' && <GeneralTab record={record} />}

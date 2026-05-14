@@ -100,7 +100,7 @@ export default function App() {
               flex: 2,
             }}
           >
-            <RequestDetail record={selectedRecord} decryptUrl={decryptUrl} />
+            <RequestDetail record={selectedRecord} decryptUrl={decryptUrl} onClose={() => setSelectedId(null)} />
           </div>
         )}
       </div>
