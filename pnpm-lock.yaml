@@ -18,6 +18,9 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@types/chrome':
+        specifier: ^0.0.300
+        version: 0.0.300
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -31,6 +34,9 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@types/chrome':
+        specifier: ^0.0.300
+        version: 0.0.300
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

@@ -50,7 +50,7 @@ window.addEventListener(EVENTS.REQUEST_CAPTURED, ((event: CustomEvent) => {
 
 function handleStorageChange(changes: { [key: string]: chrome.storage.StorageChange }) {
   if (STORAGE_KEYS.ENABLED in changes || STORAGE_KEYS.CAPTURE_FILTER in changes) {
-    sendConfig();
+    loadConfig();
   }
 }
 
