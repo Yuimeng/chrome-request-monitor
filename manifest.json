@@ -22,7 +22,8 @@
       "matches": ["<all_urls>"],
       "js": ["content/isolated.js"],
       "run_at": "document_start",
-      "world": "ISOLATED"
+      "world": "ISOLATED",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [
