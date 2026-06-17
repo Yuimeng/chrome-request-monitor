@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { RequestRecord } from '@request-monitor/shared';
-import { formatDuration, formatUrl, getDurationColor, getStatusColor } from '../utils/formatters';
+import { formatUrl, getStatusColor } from '../utils/formatters';
 
 interface RequestTableProps {
   requests: RequestRecord[];
@@ -62,9 +62,6 @@ export default function RequestTable({ requests, selectedId, onSelect }: Request
               </span>
               <span style={{ width: '36px', textAlign: 'right', color: '#666', flexShrink: 0 }}>
                 {req.type === 'fetch' ? 'FETCH' : req.type === 'har' ? 'HAR' : 'XHR'}
-              </span>
-              <span style={{ width: '60px', textAlign: 'right', color: getDurationColor(req.duration), flexShrink: 0 }}>
-                {formatDuration(req.duration)}
               </span>
             </div>
           );
