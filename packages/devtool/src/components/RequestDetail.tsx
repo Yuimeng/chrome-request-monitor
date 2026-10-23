@@ -1,7 +1,20 @@
+/**
+ * 模块：devtool / components / RequestDetail —— 右侧详情面板（标签页容器）
+ *
+ * 组成：
+ *   - TABS 五个标签页：Request Body / Response Body / General / Request Headers / Response Headers
+ *   - parseUrlParams / extractQueryKey  请求体为空时回退用 URL 查询参数填充 payload（用于解密）
+ *   - findCookieHeader  从抓包请求头里取 Cookie（HAR 导入时才有），供解密与请求头展示复用
+ *   - BodyTab 渲染时通过 key={record.id+...} 强制重挂载，切换记录会重新触发自动解密
+ *
+ * 协作：向上接收选中的 record 与 decryptUrl；向下分发 GeneralTab/HeadersTab/BodyTab；
+ *   响应体的解密 payload 会合并请求体中的 key（缺失时从 URL ?key= 提取）。
+ */
 import { useState } from 'react';
 import type { RequestRecord } from '@request-monitor/shared';
 import { STORAGE_KEYS } from '@request-monitor/shared';
 import { useStorage } from '../hooks/useStorage';
+import { findCookieHeader } from '../utils/cookies';
 import GeneralTab from './GeneralTab';
 import HeadersTab from './HeadersTab';
 import BodyTab from './BodyTab';
@@ -62,6 +75,7 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
   } catch {
     //
   }
+  const cookieHeader = findCookieHeader(record.requestHeaders);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
@@ -107,7 +121,7 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
       </div>
       <div style={{ flex: 1, overflow: 'auto' }}>
         {activeTab === 'General' && <GeneralTab record={record} />}
-        {activeTab === 'Request Headers' && <HeadersTab headers={record.requestHeaders} title="Request Headers" />}
+        {activeTab === 'Request Headers' && <HeadersTab headers={record.requestHeaders} title="Request Headers" cookieUrl={record.url} />}
         {activeTab === 'Response Headers' && <HeadersTab headers={record.responseHeaders} title="Response Headers" />}
         {activeTab === 'Request Body' && (
           <BodyTab
@@ -116,6 +130,8 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
             label="Request Body"
             decryptUrl={decryptUrl}
             decryptPayload={requestBody}
+            requestUrl={record.url}
+            cookieHeader={cookieHeader}
             autoDecrypt={autoDecrypt}
           />
         )}
@@ -126,6 +142,8 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
             label="Response Body"
             decryptUrl={decryptUrl}
             decryptPayload={{ ...responseBody, key: requestBody.key || extractQueryKey(record.url) }}
+            requestUrl={record.url}
+            cookieHeader={cookieHeader}
             autoDecrypt={autoDecrypt}
           />
         )}

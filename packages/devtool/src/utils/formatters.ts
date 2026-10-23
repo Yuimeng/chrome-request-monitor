@@ -1,3 +1,14 @@
+/**
+ * 模块：devtool / utils / formatters —— 展示格式化与配色
+ *
+ * 组成：
+ *   - formatDuration  耗时格式化（<1ms / ms / 秒）
+ *   - formatTime      时间戳 → HH:MM:SS.mmm
+ *   - formatUrl       URL → 路径+查询串（列表显示）/ 完整 URL（悬浮提示）
+ *   - getDurationColor / getStatusColor  耗时与状态码的红黄绿配色规则
+ *
+ * 协作：被 RequestTable、GeneralTab、StatusBar 等展示组件复用。
+ */
 export function formatDuration(ms: number): string {
   if (ms < 1) return '<1ms';
   if (ms < 1000) return `${Math.round(ms)}ms`;

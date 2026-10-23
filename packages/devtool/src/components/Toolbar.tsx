@@ -1,3 +1,13 @@
+/**
+ * 模块：devtool / components / Toolbar —— 顶部工具栏
+ *
+ * 组成：
+ *   - 隐藏的 <input type=file>  接受 .har/.json 文件，经 parseHar 后回调 onImport
+ *   - URL 文本框 + method/status/type 三个下拉框  组装为 FilterConfig 上抛
+ *   - Clear 按钮（onClear） / Import HAR 按钮（触发文件选择）
+ *
+ * 协作：纯受控组件；过滤值来自 App 的 useFilter，导入逻辑复用 utils/har。
+ */
 import { useRef } from 'react';
 import { FILTER_OPTIONS, LABELS } from '../utils/constants';
 import { parseHar } from '../utils/har';

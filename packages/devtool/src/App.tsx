@@ -1,3 +1,18 @@
+/**
+ * 模块：devtool / App —— DevTools 面板根组件（布局与交互编排）
+ *
+ * 组成：
+ *   - useRequests   数据源（Port 长连接）
+ *   - useFilter     展示过滤
+ *   - Toolbar       顶部工具栏（过滤条件、清空、导入 HAR）
+ *   - RequestTable  左侧虚拟滚动请求列表
+ *   - RequestDetail 右侧详情面板（可拖拽调宽，detailWidth 300~800px）
+ *   - StatusBar     底部计数状态栏
+ *   - 拖拽导入      dragenter/leave/over/drop 四个 handler + dragCounter 解决子元素
+ *     触发 leave 导致的误判；drop 后经 parseHar 导入
+ *
+ * 协作：向下分发数据与回调；decryptUrl 从 storage 读取后传给 RequestDetail 用于解密。
+ */
 import { useState, useRef, useCallback } from "react";
 import type { RequestRecord } from "@request-monitor/shared";
 import { MESSAGE_TYPES, STORAGE_KEYS } from "@request-monitor/shared";
@@ -118,7 +133,12 @@ export default function App() {
     >
       <Toolbar filters={filters} onFilterChange={setFilters} onClear={handleClear} onImport={importRequests} />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <RequestTable requests={filteredRequests} selectedId={selectedId} onSelect={handleSelect} />
+        <RequestTable
+          requests={filteredRequests}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          style={selectedId ? { flex: "1 1 400px", minWidth: 200 } : undefined}
+        />
         {selectedRecord && (
           <>
             <div

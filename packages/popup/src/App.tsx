@@ -1,3 +1,18 @@
+/**
+ * 模块：popup / App —— 弹窗根组件（监控开关与全局配置）
+ *
+ * 组成：
+ *   - useStorage(ENABLED)        监控总开关（写入 storage 即被 isolated-world 感知并 patch/restore）
+ *   - useStorage(CAPTURE_FILTER) 抓取过滤配置，配合 FilterConfig 面板草稿编辑（Cancel/确定）
+ *   - StatusBadge                运行状态 + 已捕获计数
+ *   - 计数轮询                   每 2s 发 GET_REQUEST_COUNT 向 background 查询缓冲长度
+ *   - Clear 按钮                 广播 CLEAR_REQUESTS 清空 background 缓冲与所有面板
+ *   - Decrypt 设置区             AUTO_DECRYPT 开关与 DECRYPT_URL 解密服务地址
+ *
+ * 协作：
+ *   - 配置写入 chrome.storage.sync → isolated-world onChanged → 下发 main-world 即时生效
+ *   - 指令类操作（计数/清空）走 runtime.sendMessage → background onMessage
+ */
 import { useEffect, useState } from 'react';
 import { STORAGE_KEYS, MESSAGE_TYPES } from '@request-monitor/shared';
 import type { CaptureFilter } from '@request-monitor/shared';

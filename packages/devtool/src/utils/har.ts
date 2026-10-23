@@ -1,3 +1,13 @@
+/**
+ * 模块：devtool / utils / har —— HAR 文件解析
+ *
+ * 组成：
+ *   - HarEntry / HarLog   HAR 1.2 规范的最小类型子集（只取本扩展需要的字段）
+ *   - parseHar(json)      校验 JSON 结构 → 把每个 entry 映射为 RequestRecord（type='har'）
+ *   - isHarContent(json)  快速判断文本是否为含 log.entries 的 HAR
+ *
+ * 协作：Toolbar 的文件选择导入与 App 的拖拽导入都经 parseHar → importRequests 进入列表与 background。
+ */
 import type { RequestRecord } from '@request-monitor/shared';
 
 interface HarEntry {

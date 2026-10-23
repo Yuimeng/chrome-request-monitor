@@ -1,3 +1,9 @@
+/**
+ * 模块：devtool / components / GeneralTab —— 概览标签页
+ *
+ * 组成：URL/Method/Status/Duration/Start Time/Type 六行键值表。
+ * 协作：RequestDetail 内渲染；格式化复用 utils/formatters。
+ */
 import type { RequestRecord } from '@request-monitor/shared';
 import { formatDuration, formatTime } from '../utils/formatters';
 

@@ -1,3 +1,9 @@
+/**
+ * 模块：popup / components / ToggleSwitch —— 监控总开关
+ *
+ * 组成：受控滑动开关（enabled + onChange），纯展示无内部状态。
+ * 协作：App 用它写入 ENABLED；变更会经 storage 链路实时 patch/restore 页面 fetch/XHR。
+ */
 interface ToggleSwitchProps {
   enabled: boolean;
   onChange: (enabled: boolean) => void;

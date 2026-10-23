@@ -1,3 +1,14 @@
+/**
+ * 模块：popup / components / FilterConfig —— 抓取过滤配置表单
+ *
+ * 组成：
+ *   - URL Pattern 文本框（子串匹配，如 /api/）
+ *   - fetch / XHR 两个捕获开关复选框
+ *   - Methods 按钮组：空数组 = 不限方法；点击切换白名单（toggleMethod）
+ *
+ * 协作：受控组件，草稿在 App（draftFilter）中维护，点"确定"才写入 storage，
+ *   避免每敲一个字符就触发 main-world 重新匹配。
+ */
 import type { CaptureFilter } from '@request-monitor/shared';
 
 interface FilterConfigProps {

@@ -1,3 +1,10 @@
+/**
+ * 模块：popup / hooks / useStorage —— chrome.storage.sync 响应式读写 Hook
+ *
+ * 组成：初始 get + onChanged 监听 + set，返回 [value, update, loading]。
+ * 协作：与 devtool 中同名 hook 行为一致（两处独立实现）；update 即写入，
+ *   其他监听该键的上下文（content、其他 UI）会自动收到变更。
+ */
 import { useState, useEffect, useCallback } from 'react';
 import { STORAGE_KEYS } from '@request-monitor/shared';
 

@@ -1,4 +1,22 @@
-import { useState, useEffect } from "react";
+/**
+ * 模块：devtool / components / BodyTab —— 请求/响应体查看器（含解密能力）
+ *
+ * 组成：
+ *   - handleCopy      复制当前内容（解密后优先复制解密结果），用隐藏 textarea + execCommand
+ *   - handleDecrypt   发送 DECRYPT_REQUEST 给 background，由其代理 POST 到外部解密服务（15s 超时）
+ *   - resolveCookieString 取得原请求 cookie：优先抓包记录里的 Cookie 头（HAR 导入常见），
+ *     否则用 chrome.cookies 读取原接口域名下的 cookie（浏览器自动附加的头 JS 读不到）
+ *   - 自动解密         mount 时若 autoDecrypt 且配置齐全则直接触发（key 重挂载保证按记录触发）
+ *   - 渲染             统一交给 JsonEditor（CodeMirror 只读）：JSON 自动排序 + 高亮缩进，
+ *     非 JSON 原样只读展示；解密成功后背景变黄以示区分
+ *
+ * 协作：RequestDetail 传入 body/decryptPayload/decryptUrl/requestUrl/cookieHeader；
+ *   解密请求经 background 中转（避免面板侧跨域限制），结果回写 decrypted 状态。
+ */
+import {useEffect, useState} from "react";
+import {JsonEditor} from "./JsonEditor";
+import {resolveCookieString} from "../utils/cookies";
+
 
 interface BodyTabProps {
   body: string | undefined;
@@ -6,9 +24,29 @@ interface BodyTabProps {
   decryptPayload?: unknown;
   decryptUrl?: string;
   autoDecrypt?: boolean;
+  /** 原请求 URL，用于在抓包记录缺少 Cookie 头时按域名读取 cookie */
+  requestUrl?: string;
+  /** 抓包记录里的 Cookie 请求头（HAR 导入场景常见），优先使用 */
+  cookieHeader?: string;
 }
 
-export default function BodyTab({ body, label, decryptPayload, decryptUrl, autoDecrypt }: BodyTabProps) {
+/** 把 cookie 合并进解密载荷；非对象载荷（数组/字符串等）原样透传 */
+function attachCookie(payload: unknown, cookie: string): unknown {
+  if (payload !== null && typeof payload === "object" && !Array.isArray(payload)) {
+    return { ...(payload as Record<string, unknown>), cookie };
+  }
+  return payload;
+}
+
+export default function BodyTab({
+  body,
+  label,
+  decryptPayload,
+  decryptUrl,
+  autoDecrypt,
+  requestUrl,
+  cookieHeader,
+}: BodyTabProps) {
   const [decrypted, setDecrypted] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
   const [decryptError, setDecryptError] = useState<string | null>(null);
@@ -33,11 +71,18 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl, autoD
     if (!decryptUrl || !decryptPayload) return;
     setDecrypting(true);
     setDecryptError(null);
+    // 解密接口通常需要登录态 cookie：优先抓包记录，缺失时按原接口域名实时读取
+    const cookie = await resolveCookieString(cookieHeader, requestUrl);
     try {
       chrome.runtime.sendMessage(
         {
           type: "DECRYPT_REQUEST",
-          payload: { url: decryptUrl, body: decryptPayload, headers: { "Content-Type": "application/json" }, timeoutMs: 15000 },
+          payload: {
+            url: decryptUrl,
+            body: cookie ? attachCookie(decryptPayload, cookie) : decryptPayload,
+            headers: { "Content-Type": "application/json" },
+            timeoutMs: 15000,
+          },
         },
         (response) => {
           if (response.success) {
@@ -70,16 +115,16 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl, autoD
     );
   }
 
-  let formatted = content;
-  try {
-    formatted = JSON.stringify(JSON.parse(content), null, 2);
-  } catch {
-    // not JSON, show raw
-  }
-
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ padding: "8px 12px", display: "flex", gap: "6px", alignItems: "center" }}>
+      <div
+        style={{
+          padding: "8px 12px",
+          display: "flex",
+          gap: "6px",
+          alignItems: "center",
+        }}
+      >
         <button
           onClick={handleCopy}
           style={{
@@ -131,24 +176,22 @@ export default function BodyTab({ body, label, decryptPayload, decryptUrl, autoD
             Original
           </button>
         )}
-        {decryptError && <span style={{ color: "#d32f2f", fontSize: "11px" }}>{decryptError}</span>}
+        {decryptError && (
+          <span style={{ color: "#d32f2f", fontSize: "11px" }}>
+            {decryptError}
+          </span>
+        )}
       </div>
-      <pre
+      <div
         style={{
-          margin: 0,
-          padding: "12px",
-          fontSize: "11px",
-          fontFamily: "monospace",
-          color: "#333",
-          overflow: "auto",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-all",
-          background: decrypted ? "#fffde7" : "#fafafa",
           flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+          background: decrypted ? "#fffde7" : "#fafafa",
         }}
       >
-        {formatted}
-      </pre>
+        <JsonEditor content={content} />
+      </div>
     </div>
   );
 }

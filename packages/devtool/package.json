@@ -4,20 +4,25 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite dev",
     "build": "vite build"
   },
   "dependencies": {
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/state": "^6.7.6",
     "@request-monitor/shared": "workspace:*",
     "@tanstack/react-virtual": "^3.11.0",
+    "codemirror": "^6.0.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-json-view-lite": "^2.5.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.4.0",
-    "vite": "^6.0.0",
-    "typescript": "^5.7.0",
+    "@types/chrome": "^0.0.300",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@types/chrome": "^0.0.300"
+    "@vitejs/plugin-react": "^4.4.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
   }
 }

@@ -1,3 +1,12 @@
+/**
+ * 模块：devtool / components / RequestTable —— 请求列表（虚拟滚动）
+ *
+ * 组成：
+ *   - useVirtualizer（@tanstack/react-virtual）  仅渲染可视区行，支撑 500 条记录流畅滚动
+ *   - 行内容：method / 路径+查询串 / 状态码（配色）/ 类型标记（FETCH·XHR·HAR）
+ *
+ * 协作：接收 useFilter 过滤后的数组；点击行 → onSelect → App 更新 selectedId → 右侧显示 RequestDetail。
+ */
 import { useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { RequestRecord } from '@request-monitor/shared';
@@ -7,9 +16,10 @@ interface RequestTableProps {
   requests: RequestRecord[];
   selectedId: string | null;
   onSelect: (record: RequestRecord) => void;
+  style?: React.CSSProperties;
 }
 
-export default function RequestTable({ requests, selectedId, onSelect }: RequestTableProps) {
+export default function RequestTable({ requests, selectedId, onSelect, style }: RequestTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -19,7 +29,7 @@ export default function RequestTable({ requests, selectedId, onSelect }: Request
   });
 
   return (
-    <div ref={parentRef} style={{ flex: 1, overflow: 'auto' }}>
+    <div ref={parentRef} style={{ flex: 1, overflow: 'auto', ...style }}>
       <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
         {virtualizer.getVirtualItems().map((virtualItem) => {
           const req = requests[virtualItem.index];

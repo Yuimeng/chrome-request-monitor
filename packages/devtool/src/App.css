@@ -6,7 +6,8 @@
 
 body {
   background: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 ::-webkit-scrollbar {
@@ -21,4 +22,9 @@ body {
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+@font-face {
+  font-family: code-font;
+  src: url("./Monaco.ttf");
 }

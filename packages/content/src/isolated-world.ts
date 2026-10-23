@@ -1,3 +1,20 @@
+/**
+ * 模块：content / isolated-world —— 隔离世界内容脚本（桥梁层）
+ *
+ * 组成：
+ *   - DEFAULT_FILTER / loadConfig / dispatchConfig  从 chrome.storage.sync 读取开关与抓取过滤，
+ *     并通过 CustomEvent(EVENTS.MONITOR_CONFIG) 下发给 main-world
+ *   - injectMainScript     以 <script src=chrome.runtime.getURL()> 注入 main-world 脚本到页面
+ *   - pendingBuffer / flushBuffer  上报缓冲：把页面事件攒批后 sendMessage 给 background，
+ *     失败自动重试（处理 Service Worker 休眠/重启），200ms 间隔连续冲刷
+ *   - handleStorageChange  监听配置变化，实时把新的开关/过滤规则转发给 main-world
+ *
+ * 协作：
+ *   - 页面 fetch/XHR 被 hook 后发出 REQUEST_CAPTURED CustomEvent → 本层接收 → 批量转发给 background
+ *   - popup 修改 chrome.storage.sync 配置 → 本层 onChanged → 注入的 main-world 即时生效
+ *   - 之所以分两层：内容脚本运行在隔离世界，无法 hook 页面的 window.fetch，
+ *     必须由 main-world 在页面主世界里替换原型方法（见 main-world.ts）
+ */
 import { EVENTS, MESSAGE_TYPES, STORAGE_KEYS } from '@request-monitor/shared';
 import type { CaptureFilter, RequestRecord } from '@request-monitor/shared';
 
@@ -11,10 +28,11 @@ const DEFAULT_FILTER: CaptureFilter = {
 let savedConfig: { enabled: boolean; filter: CaptureFilter } | null = null;
 let mainScriptLoaded = false;
 
-// Buffer for reliable message delivery when SW is terminated
+// 页面侧上报缓冲：SW 可能已休眠导致 sendMessage 失败，攒批 + 重试保证不丢数据
 const pendingBuffer: RequestRecord[] = [];
 let flushing = false;
 
+// 冲刷缓冲：一次性批量发送，成功才移除；仍有积压则 200ms 后继续（避免高频小包）
 function flushBuffer() {
   if (flushing || pendingBuffer.length === 0) return;
   flushing = true;
@@ -38,6 +56,7 @@ function flushBuffer() {
   );
 }
 
+// 把当前配置广播给 main-world（需等 main 脚本加载完成，否则事件无人监听）
 function dispatchConfig() {
   if (!savedConfig || !mainScriptLoaded) return;
   window.dispatchEvent(new CustomEvent(EVENTS.MONITOR_CONFIG, {
@@ -45,6 +64,7 @@ function dispatchConfig() {
   }));
 }
 
+// 从 chrome.storage.sync 读取启用开关与抓取过滤，与默认值合并后下发
 function loadConfig() {
   chrome.storage.sync.get([STORAGE_KEYS.ENABLED, STORAGE_KEYS.CAPTURE_FILTER], (result) => {
     const enabled = result[STORAGE_KEYS.ENABLED] ?? false;
@@ -54,6 +74,7 @@ function loadConfig() {
   });
 }
 
+// 注入 main-world 脚本：内容脚本默认隔离世界，需通过 <script> 标签进入页面主世界才能 patch fetch/XHR
 function injectMainScript() {
   const script = document.createElement('script');
   script.src = chrome.runtime.getURL('content/main.js');
@@ -65,9 +86,11 @@ function injectMainScript() {
   (document.documentElement || document.head || document).appendChild(script);
 }
 
+// 启动序列：先读配置，同时注入 main 脚本（两者完成时机会各自 dispatchConfig）
 loadConfig();
 injectMainScript();
 
+// 监听 main-world 发出的捕获事件，转入缓冲并尝试冲刷
 window.addEventListener(EVENTS.REQUEST_CAPTURED, ((event: CustomEvent) => {
   pendingBuffer.push(event.detail);
   flushBuffer();
@@ -78,6 +101,7 @@ setInterval(() => {
   if (pendingBuffer.length > 0) flushBuffer();
 }, 1000);
 
+// 配置变更（popup 修改开关/过滤）→ 重新加载并转发给 main-world 实时生效
 function handleStorageChange(changes: { [key: string]: chrome.storage.StorageChange }) {
   if (STORAGE_KEYS.ENABLED in changes || STORAGE_KEYS.CAPTURE_FILTER in changes) {
     loadConfig();

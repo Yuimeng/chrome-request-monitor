@@ -1,3 +1,9 @@
+/**
+ * 模块：popup / components / StatusBadge —— 运行状态徽标
+ *
+ * 组成：绿点/灰点表示 Running/Stopped + 已捕获请求计数。
+ * 协作：App 传入 enabled 与轮询得到的 count。
+ */
 interface StatusBadgeProps {
   enabled: boolean;
   count: number;

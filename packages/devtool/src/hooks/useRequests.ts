@@ -1,3 +1,14 @@
+/**
+ * 模块：devtool / hooks / useRequests —— 请求数据源 Hook
+ *
+ * 组成：
+ *   - Port 长连接（connect）      连接 background，接收全量回放（CAPTURED_REQUESTS_RESPONSE）、
+ *     增量推送（REQUEST_CAPTURED）与清空指令（CLEAR_REQUESTS）
+ *   - 断线重连（onDisconnect）     Service Worker 休眠会导致连接断开，500ms 后自动重连并重新回放
+ *   - clearRequests / importRequests  本地清空、导入 HAR（同时把记录同步给 background 持久化）
+ *
+ * 协作：App 调用本 Hook 获取 requests 列表；数据源头是 content 捕获、经 background 广播的记录。
+ */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MESSAGE_TYPES, PORT_NAME_DEVTOOLS } from '@request-monitor/shared';
 import type { RequestRecord } from '@request-monitor/shared';
@@ -9,6 +20,7 @@ export function useRequests() {
   useEffect(() => {
     let disconnected = false;
 
+    // 建立 Port 连接并注册消息/断开监听；可重复调用以实现重连
     function connect() {
       if (disconnected) return;
       const port = chrome.runtime.connect({ name: PORT_NAME_DEVTOOLS });
