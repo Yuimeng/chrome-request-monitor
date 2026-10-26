@@ -25,6 +25,19 @@ export interface RequestRecord {
   startTime: number;
   duration: number;
   type: 'fetch' | 'xhr' | 'har';
+  /**
+   * Cookie 请求头值。来源见 cookieSource：
+   * 实时抓包时页面 JS 读不到浏览器注入的 Cookie，由扩展进程侧补充（快照或 webRequest 权威值）
+   */
+  requestCookie?: string;
+  /** requestCookie 的来源：header=抓包头（HAR 导入）、snapshot=cookies API 快照、webrequest=真实发送头 */
+  cookieSource?: 'header' | 'snapshot' | 'webrequest';
+  /** webRequest 已观察到该请求；为 true 且无 requestCookie 时表示“权威的没带 Cookie” */
+  cookieObserved?: boolean;
+  /** 页面侧判定本次请求是否会携带 Cookie（fetch credentials / XHR withCredentials 归一化），false 时跳过快照补全 */
+  cookiesSent?: boolean;
+  /** 实际发起请求的时刻（epoch ms），用于与 webRequest 事件对齐及修正 Start Time 显示 */
+  sentAt?: number;
 }
 
 export interface FilterConfig {

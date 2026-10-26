@@ -15,6 +15,8 @@
  *     接收 EVENTS.MONITOR_CONFIG（配置），发送 EVENTS.REQUEST_CAPTURED（捕获结果）
  *   - 响应体仅在 content-type 含 text/json 且 ≤ MAX_BODY_SIZE(1MB) 时记录
  *   - fetch 失败（网络错误）也会记录，status 记为 0
+ *   - 方案 A+（Cookie 捕获降误报）：URL 统一绝对化为 document.baseURI 基准，并记录
+ *     cookiesSent（本次请求发送语义上是否带 Cookie）与 sentAt（墙钟发送时刻）两个可选字段
  */
 import { EVENTS, MAX_BODY_SIZE } from "@request-monitor/shared";
 import type { CaptureFilter } from "@request-monitor/shared";
@@ -32,6 +34,32 @@ function matchesFilter(method: string, url: string, type: "fetch" | "xhr"): bool
   if (currentFilter.urlPattern && !url.toLowerCase().includes(currentFilter.urlPattern.toLowerCase())) return false;
   if (currentFilter.methods.length > 0 && !currentFilter.methods.includes(method)) return false;
   return true;
+}
+
+// ===== 方案 A+ 辅助：URL 绝对化 / 发送语义判定 =====
+// URL 解析统一以 document.baseURI 为基准（页面存在 <base href> 时 location.href 不是正确基准）；
+// 解析失败回退原字符串，保证 hook 永远不会因异常 URL 影响页面自身请求
+function toAbsoluteUrl(url: string): string {
+  try {
+    return new URL(url, document.baseURI).href;
+  } catch {
+    return url;
+  }
+}
+
+// 目标 URL 是否与当前页面同源；无法解析时按“不同源”处理（宁可少补 Cookie，避免误报）
+function isSameOrigin(url: string): boolean {
+  try {
+    return new URL(url, document.baseURI).origin === location.origin;
+  } catch {
+    return false;
+  }
+}
+
+// fetch 的 input 联合类型（string | URL | Request）中只有 Request 带 credentials 语义；
+// 用结构化判断而非 instanceof，兼容来自其他 realm（iframe）的 Request 对象
+function isRequest(input: RequestInfo | URL): input is Request {
+  return typeof input === "object" && input !== null && "credentials" in input;
 }
 
 function generateId(): string {
@@ -53,19 +81,31 @@ function patchFetch() {
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const startTime = performance.now();
-    const requestUrl =
+    const rawUrl =
       typeof input === "string"
         ? input
         : input instanceof URL
           ? input.href
           : input.url;
+    // 方案 A+：record.url 统一记录绝对 URL（background 的 chrome.cookies.getAll({url})
+    // 与 webRequest 关联都要求绝对 URL）；解析失败时 toAbsoluteUrl 回退原字符串
+    const requestUrl = toAbsoluteUrl(rawUrl);
     const requestMethod = (
-      init?.method ??
-      (typeof input === "object" && "method" in input
-        ? input.method
-        : undefined) ??
-      "GET"
+      init?.method ?? (isRequest(input) ? input.method : undefined) ?? "GET"
     ).toUpperCase();
+
+    // 发送语义判定（方案 A+）：Cookie 是 forbidden request header，页面读不到实际值，
+    // 但可以判断“这次请求按 fetch 语义是否带 Cookie”，供 background 跳过明显不会带 Cookie 的请求。
+    // credentials 优先级：init 显式指定 > Request 对象自身 > fetch 默认值 same-origin
+    const credentials: RequestCredentials =
+      init?.credentials ?? (isRequest(input) ? input.credentials : "same-origin");
+    const cookiesSent =
+      credentials === "include" ||
+      (credentials === "same-origin" && isSameOrigin(requestUrl));
+
+    // 墙钟发送时刻（epoch ms）：startTime 是 performance.now() 相对值，既无法与 webRequest 对齐，
+    // 也无法直接格式化为日期；声明在 try 之外，保证失败路径同样能带上
+    const sentAt = Date.now();
     const requestHeaders: [string, string][] = [];
 
     if (init?.headers) {
@@ -115,6 +155,9 @@ function patchFetch() {
             responseBody,
             startTime,
             duration,
+            // 方案 A+：成功路径同样携带发送语义与墙钟时刻
+            cookiesSent,
+            sentAt,
             type: "fetch",
           },
         }),
@@ -139,6 +182,9 @@ function patchFetch() {
             responseBody: undefined,
             startTime,
             duration,
+            // 方案 A+：失败路径（status=0）也要带上，否则 background 无法判断该请求是否可能有 Cookie
+            cookiesSent,
+            sentAt,
             type: "fetch",
           },
         }),
@@ -170,7 +216,8 @@ function patchXHR() {
     const originalOpen = xhr.open.bind(xhr);
     xhr.open = function (m: string, url: string | URL) {
       method = m.toUpperCase();
-      requestUrl = typeof url === "string" ? url : url.href;
+      // 方案 A+：XHR 的 url 同样绝对化，供 cookiesSent 判定与 background 补全 Cookie 使用
+      requestUrl = toAbsoluteUrl(typeof url === "string" ? url : url.href);
       originalOpen(m, url);
     };
 
@@ -183,6 +230,13 @@ function patchXHR() {
     const originalSend = xhr.send.bind(xhr);
     xhr.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
       requestBody = typeof body === "string" ? body : undefined;
+
+      // 发送语义判定（方案 A+）：必须在 send 处读取 withCredentials——页面可能在 open 之后、
+      // send 之前设置它，构造函数/send 之前的任何时刻读到的值都不可靠。
+      // 规则：同源请求总是带 Cookie；跨域默认不带（withCredentials 默认 false），显式 true 才带
+      const cookiesSent = isSameOrigin(requestUrl) || xhr.withCredentials;
+      // 墙钟发送时刻：XHR 的 startTime 取在构造函数里，与实际发送时刻可能相差很远
+      const sentAt = Date.now();
 
       // loadend：请求结束（成功或失败都会触发），此时可安全读取 xhr.status/responseText
       xhr.addEventListener("loadend", () => {
@@ -227,6 +281,9 @@ function patchXHR() {
               responseBody,
               startTime,
               duration,
+              // 方案 A+：XHR 成功/失败（loadend 统一触发）都携带发送语义与墙钟时刻
+              cookiesSent,
+              sentAt,
               type: "xhr",
             },
           }),

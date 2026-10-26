@@ -2,6 +2,8 @@
  * 模块：devtool / components / GeneralTab —— 概览标签页
  *
  * 组成：URL/Method/Status/Duration/Start Time/Type 六行键值表。
+ *   Start Time 优先用 record.sentAt（页面侧记录的实际发起时刻，epoch ms）；
+ *   HAR 导入 / 旧记录没有 sentAt，回退 record.startTime（原行为）。
  * 协作：RequestDetail 内渲染；格式化复用 utils/formatters。
  */
 import type { RequestRecord } from '@request-monitor/shared';
@@ -17,7 +19,8 @@ export default function GeneralTab({ record }: GeneralTabProps) {
     ['Method', record.method],
     ['Status', String(record.responseStatus)],
     ['Duration', formatDuration(record.duration)],
-    ['Start Time', formatTime(record.startTime)],
+    // 实时抓包的 startTime 是 performance.now()（格式化会显示 1970），优先用 epoch ms 的 sentAt
+    ['Start Time', formatTime(record.sentAt ?? record.startTime)],
     ['Type', record.type === 'fetch' ? 'fetch()' : 'XMLHttpRequest'],
   ];
 

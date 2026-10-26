@@ -4,7 +4,8 @@
  * 组成：
  *   - TABS 五个标签页：Request Body / Response Body / General / Request Headers / Response Headers
  *   - parseUrlParams / extractQueryKey  请求体为空时回退用 URL 查询参数填充 payload（用于解密）
- *   - findCookieHeader  从抓包请求头里取 Cookie（HAR 导入时才有），供解密与请求头展示复用
+ *   - cookieHeader  Cookie 取值：优先抓包请求头（HAR 导入才有），其次记录里的
+ *     requestCookie 快照 / webRequest 权威值（实时抓包由 background 补全）
  *   - BodyTab 渲染时通过 key={record.id+...} 强制重挂载，切换记录会重新触发自动解密
  *
  * 协作：向上接收选中的 record 与 decryptUrl；向下分发 GeneralTab/HeadersTab/BodyTab；
@@ -75,7 +76,14 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
   } catch {
     //
   }
-  const cookieHeader = findCookieHeader(record.requestHeaders);
+  // 实时抓包时浏览器注入的 Cookie 不在抓包头里：优先抓包头，其次记录自带的快照 /
+  // webRequest 权威值。BodyTab 解密复用同一个值，不再依赖“点解密那一刻”的 store 状态。
+  const capturedCookie = findCookieHeader(record.requestHeaders);
+  const cookieHeader = capturedCookie ?? record.requestCookie;
+  // 只有抓包头没有 Cookie 时才把记录快照/观察结论传给 HeadersTab；
+  // 记录里完全没有 Cookie 来源时仍传 cookieUrl，保留旧记录的 store 懒查能力。
+  const hasRecordCookie = !capturedCookie && !!record.requestCookie;
+  const useStoreFallback = !capturedCookie && !record.requestCookie;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
@@ -121,7 +129,16 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
       </div>
       <div style={{ flex: 1, overflow: 'auto' }}>
         {activeTab === 'General' && <GeneralTab record={record} />}
-        {activeTab === 'Request Headers' && <HeadersTab headers={record.requestHeaders} title="Request Headers" cookieUrl={record.url} />}
+        {activeTab === 'Request Headers' && (
+          <HeadersTab
+            headers={record.requestHeaders}
+            title="Request Headers"
+            snapshotCookie={hasRecordCookie ? record.requestCookie : undefined}
+            cookieSource={hasRecordCookie ? record.cookieSource : undefined}
+            cookieObserved={useStoreFallback ? record.cookieObserved : undefined}
+            cookieUrl={useStoreFallback && record.cookieObserved !== true ? record.url : undefined}
+          />
+        )}
         {activeTab === 'Response Headers' && <HeadersTab headers={record.responseHeaders} title="Response Headers" />}
         {activeTab === 'Request Body' && (
           <BodyTab
@@ -141,7 +158,7 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
             body={record.responseBody}
             label="Response Body"
             decryptUrl={decryptUrl}
-            decryptPayload={{ ...responseBody, key: requestBody.key || extractQueryKey(record.url) }}
+            decryptPayload={{ ...responseBody, key: requestBody?.key || extractQueryKey(record.url) }}
             requestUrl={record.url}
             cookieHeader={cookieHeader}
             autoDecrypt={autoDecrypt}

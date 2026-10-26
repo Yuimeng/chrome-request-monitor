@@ -37,13 +37,19 @@ chrome-request-monitor/
             │   └── handleStorageChange()   # 配置变更实时转发
             │
     ├── background/
-    │   └── src/index.ts              # 【Service Worker】消息中枢 + 数据缓冲
-    │       ├── requestBuffer         #   内存缓冲（≤500 条，session 持久化）
-    │       ├── broadcastToDevTools() #   向所有 DevTools 面板实时推送
-    │       ├── persist/restoreBuffer #   chrome.storage.session 写入/恢复
-    │       ├── handleDecrypt()       #   代理 POST 到外部解密服务（带超时）
-    │       ├── onMessage             #   消息路由：抓取/批量/查询/解密/导入/清空
-    │       └── onConnect             #   DevTools Port 接入，连接时回放全量
+    │   └── src/                      # 【Service Worker】消息中枢 + 数据缓冲
+    │       ├── index.ts              #   消息路由、入列队列、解密代理、面板推送
+    │       │   ├── requestBuffer         #   内存缓冲（≤500 条，session 持久化）
+    │       │   ├── ingestRecords()       #   串行入列：先补 Cookie 快照再 push/broadcast/persist
+    │       │   ├── mergeRecords()        #   批量并入缓冲 + 广播 + 持久化
+    │       │   ├── broadcastToDevTools() #   向所有 DevTools 面板实时推送
+    │       │   ├── persist/restoreBuffer #   chrome.storage.session 写入/恢复
+    │       │   ├── handleDecrypt()       #   代理 POST 到外部解密服务（带超时）
+    │       │   ├── onMessage             #   消息路由：抓取/批量/查询/解密/导入/清空
+    │       │   └── onConnect             #   DevTools Port 接入，连接时回放全量
+    │       └── cookie-snapshot.ts    #   【方案 A】Cookie 快照补全
+    │           ├── getCookieHeaderSnapshot()           # 按 URL 读 chrome.cookies（30s 缓存 + 超时）
+    │           └── enrichRecordsWithCookieSnapshot()   # 写 requestCookie / cookieSource='snapshot'
     │
     ├── devtool/                      ┌─────────────────────────────────────────┐
     │   └── src/                      │  DevTools 面板（React）                  │
@@ -93,7 +99,9 @@ chrome-request-monitor/
 │ isolated-world.ts 接收 → pendingBuffer    │
 │        ↓ runtime.sendMessage(批量)        │
 ├──────────── Service Worker ──────────────┤
-│ background: requestBuffer (≤500)          │
+│ background: ingestRecords（串行入列）       │
+│   ├─ enrichRecords：chrome.cookies 补 Cookie│
+│   ├─ requestBuffer (≤500)                 │
 │   ├─ persist → chrome.storage.session     │
 │   └─ broadcast → DevTools Port            │
 ├──────────── UI 层 ───────────────────────┤
@@ -140,3 +148,8 @@ popup 写 storage.sync → isolated-world onChanged
 4. **解密代理**：面板跨域受限，解密请求统一由 background `fetch` 转发到外部服务
    （地址由 popup 配置 `DECRYPT_URL`，15s 超时）。
 5. **虚拟滚动**：请求列表用 `@tanstack/react-virtual` 只渲染可视区，支撑大列表流畅滚动。
+6. **Cookie 补充（方案 A）**：页面 JS 读不到浏览器注入的 Cookie（forbidden request header），
+   background 在记录入列前用 `chrome.cookies.getAll({ url })` 生成近似快照（30s 缓存 + 1s 超时），
+   content 侧同时记录 `cookiesSent`（credentials 语义）用于跳过明显不带 Cookie 的请求；
+   devtool 优先展示记录快照并标注来源（`cookieSource`），HAR 导入仍以抓包头为准。
+   设计细节见 `docs/cookie-capture.md`（Phase 2 的 webRequest 权威读取尚未实现）。
