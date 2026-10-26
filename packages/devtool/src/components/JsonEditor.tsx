@@ -4,13 +4,14 @@
  * 组成：
  *   - sortObjectKeys  递归按字母序排序对象 key，让解密前后字段对比更稳定
  *   - formatJson       解析 + 排序 + 两空格缩进；非 JSON 内容原样返回
- *   - readOnlyTheme    透明背景 / code-font 主题，跟随外层容器配色（解密态黄色可透出）
+ *   - readOnlyTheme    通过 CSS 变量 --json-bg 跟随外层配色；行号槽用同一不透明底色，
+ *                      横向滚动时内容从下方穿过也不会与行号文字重叠
  *   - EditorView       basicSetup + readOnly + editable(false) + json() 语法高亮
  *
  * 协作：由 BodyTab 全权渲染请求体/响应体；content 变化时 dispatch 替换文档，
  *   不重建 EditorView（保留滚动位置），卸载时 destroy 避免 DOM 叠加泄漏。
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { basicSetup, EditorView } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { json } from "@codemirror/lang-json";
@@ -44,7 +45,7 @@ function formatJson(content: string): string {
 const readOnlyTheme = EditorView.theme({
   "&": {
     height: "100%",
-    backgroundColor: "transparent",
+    backgroundColor: "var(--json-bg, #fafafa)",
     fontSize: "11px",
     color: "#333",
   },
@@ -63,7 +64,8 @@ const readOnlyTheme = EditorView.theme({
     overflowWrap: "normal",
   },
   ".cm-gutters": {
-    backgroundColor: "transparent",
+    // 必须是不透明底色：横向滚动时代码行会从行号下方经过，透明底会露字
+    backgroundColor: "var(--json-bg, #fafafa)",
     border: "none",
     color: "#bbb",
   },
@@ -72,7 +74,13 @@ const readOnlyTheme = EditorView.theme({
   ".cm-activeLineGutter": { backgroundColor: "transparent" },
 });
 
-export const JsonEditor = ({ content }: { content: string }) => {
+interface JsonEditorProps {
+  content: string;
+  /** 代码区与行号槽的背景色（解密态为淡黄），默认浅灰 */
+  background?: string;
+}
+
+export const JsonEditor = ({ content, background = "#fafafa" }: JsonEditorProps) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -111,5 +119,16 @@ export const JsonEditor = ({ content }: { content: string }) => {
     });
   }, [content]);
 
-  return <div ref={hostRef} style={{ height: "100%", width: "100%" }} />;
+  return (
+    <div
+      ref={hostRef}
+      style={
+        {
+          height: "100%",
+          width: "100%",
+          "--json-bg": background,
+        } as CSSProperties
+      }
+    />
+  );
 };

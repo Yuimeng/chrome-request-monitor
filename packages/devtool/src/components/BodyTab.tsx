@@ -190,7 +190,10 @@ export default function BodyTab({
           background: decrypted ? "#fffde7" : "#fafafa",
         }}
       >
-        <JsonEditor content={content} />
+        <JsonEditor
+          content={content}
+          background={decrypted ? "#fffde7" : "#fafafa"}
+        />
       </div>
     </div>
   );
