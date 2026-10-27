@@ -10,13 +10,14 @@
  *   - StatusBadge            运行状态、已捕获计数与缓冲占用进度
  *   - Clear 按钮             广播 CLEAR_REQUESTS 清空 background 缓冲与所有面板
  *   - Decrypt 设置区         AUTO_DECRYPT 开关与 DECRYPT_URL 解密服务地址
+ *     （地址用本地草稿 + 防抖写入，避免每次按键回写 storage 导致光标跳到末尾）
  *
  * 协作：
  *   - 配置写入 chrome.storage.sync → isolated-world onChanged → 下发 main-world 即时生效
  *   - MAX_REQUESTS 写入后由 background onChanged 感知，立即按时间淘汰超出部分
  *   - 指令类操作（计数/清空）走 runtime.sendMessage → background onMessage
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_LIMITS, MESSAGE_TYPES, STORAGE_KEYS, normalizeLimit } from '@request-monitor/shared';
 import type { CaptureFilter, LimitConfig } from '@request-monitor/shared';
 import { useStorage } from './hooks/useStorage';
@@ -43,6 +44,30 @@ export default function App() {
   const [maxBodySize, setMaxBodySize] = useStorage<number>(STORAGE_KEYS.MAX_BODY_SIZE, DEFAULT_LIMITS.maxBodySize);
   const [maxRequests, setMaxRequests] = useStorage<number>(STORAGE_KEYS.MAX_REQUESTS, DEFAULT_LIMITS.maxRequests);
   const [showLimits, setShowLimits] = useState(false);
+
+  // 解密地址输入框：用本地草稿驱动，不再每次按键直写 storage.sync。
+  // 直接受控于 storage 会形成「按键 → 写入 → onChanged 回写」的回环，
+  // 异步回写让受控值短暂回退，光标被重置到末尾；同时高频写入会触发 sync 配额限制。
+  const [urlDraft, setUrlDraft] = useState('');
+  const urlCommitTimer = useRef<number | null>(null);
+
+  // 外部值变化（首次加载、其他窗口修改）同步到草稿；输入中不覆盖，避免打断输入
+  useEffect(() => {
+    if (document.activeElement?.id === 'decrypt-url') return;
+    setUrlDraft(decryptUrl);
+  }, [decryptUrl]);
+
+  useEffect(() => () => {
+    if (urlCommitTimer.current !== null) window.clearTimeout(urlCommitTimer.current);
+  }, []);
+
+  const commitDecryptUrl = (value: string) => {
+    if (urlCommitTimer.current !== null) {
+      window.clearTimeout(urlCommitTimer.current);
+      urlCommitTimer.current = null;
+    }
+    setDecryptUrl(value);
+  };
 
   // 存储中的值可能缺失/越界（历史数据、手改 storage），统一归一化后再使用
   const limits: LimitConfig = {
@@ -183,8 +208,24 @@ export default function App() {
               className="text-input"
               type="text"
               placeholder="http://localhost:3000/decrypt"
-              value={decryptUrl}
-              onChange={(e) => setDecryptUrl(e.target.value)}
+              value={urlDraft}
+              onChange={(e) => {
+                const value = e.target.value;
+                setUrlDraft(value);
+                // 防抖落盘：停止输入 400ms 后才写 storage，兼顾不丢内容与写入频率
+                if (urlCommitTimer.current !== null) window.clearTimeout(urlCommitTimer.current);
+                urlCommitTimer.current = window.setTimeout(() => {
+                  urlCommitTimer.current = null;
+                  setDecryptUrl(value);
+                }, 400);
+              }}
+              onBlur={() => commitDecryptUrl(urlDraft)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
             />
           </div>
         </div>
