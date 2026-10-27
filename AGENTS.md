@@ -53,7 +53,8 @@ pnpm assemble
 ## 核心架构
 
 - **消息流**：content script → background service worker → devtools panel
-- **存储**：使用 `chrome.storage.session` 保存请求记录（最多 500 条）
+- **存储**：使用 `chrome.storage.session` 保存请求记录（条数上限由 `max_requests` 配置，默认 500 条，超出按时间淘汰最早记录）
+- **容量限制**：`max_body_size`（单条请求体/响应体上限，默认 1MB，超出截断）与 `max_requests`（保留条数）在 popup 的 Limits 面板配置，默认值与合法区间定义在 `packages/shared/src/limits.ts`
 - **注入机制**：isolated-world 注入 main-world 脚本，通过 CustomEvent 通信
 
 ## 常见陷阱

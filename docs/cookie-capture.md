@@ -8,7 +8,7 @@
 > **实现状态（2026-10-26）**：**Phase 1（方案 A + A+）已落地**，涉及：
 > `packages/background/src/cookie-snapshot.ts`（新增）、`packages/background/src/index.ts`、
 > `packages/shared/src/types.ts`、`packages/content/src/main-world.ts`、
-> `packages/devtool/src/{utils/cookies.ts, components/HeadersTab.tsx, components/RequestDetail.tsx, components/GeneralTab.tsx}`。
+> `packages/devtool/src/{utils/cookies.ts, components/HeadersTab.tsx, components/RequestDetail.tsx, components/BodyTab.tsx, components/GeneralTab.tsx}`。
 > Phase 2（webRequest）未实现；`cookieSource='webrequest'` / `cookieObserved` 的 UI 与类型分支已预留。
 > 构建后加载 `dist/` 即可验证。
 
@@ -77,10 +77,11 @@
 | background SW | ✅ | 有 `"cookies"` 权限 + `<all_urls>` host 权限即可 |
 | devtool 面板 | ✅ | 但只在面板打开时存在，且读取时刻比请求时刻更晚 |
 
-本仓库现在是"devtool 面板里点开详情时才懒查"（`packages/devtool/src/utils/cookies.ts`），
-面板没开 / 没点开详情 / 导出 / 解密链路都拿不到 Cookie。把它提前到 **background 收到记录时**，
-能让 `requestBuffer`、Port 广播、`storage.session` 持久化、解密、未来的 HAR 导出一次性受益，
-且**不需要新增消息类型**（记录入列前就补好，下游拿到的就是补全后的记录）。
+改造前是"devtool 面板里点开详情时才懒查" cookie store（`packages/devtool/src/utils/cookies.ts`），
+面板没开 / 没点开详情 / 导出 / 解密链路都拿不到 Cookie；现在改为 **background 收到记录时**补全。
+这让 `requestBuffer`、Port 广播、`storage.session` 持久化、解密、未来的 HAR 导出一次性受益，
+且**不需要新增消息类型**（记录入列前就补好，下游拿到的就是补全后的记录）；
+devtool 侧只消费记录字段，不再访问 cookie store。
 
 ### 2.2 数据契约（`packages/shared/src/types.ts`）
 
@@ -208,42 +209,28 @@ case MESSAGE_TYPES.REQUESTS_BATCH: {
   Cookie 自身增量可控，但**现有 body 可能早已让持久化失效**（见 §5.3），这不是本需求引入、也不由本需求解决；
 - 缓存 key 用**完整 URL**（path 影响 cookie 集合），TTL 30s；SW 休眠后 Map 丢失，重新读取即可。
 
-### 2.4 展示 / 解密链路复用（devtool 最小 diff）
+### 2.4 展示 / 解密链路（devtool）
 
-1. `packages/devtool/src/utils/cookies.ts`：修掉"按 name 去重"的缺陷——浏览器对同名不同 path 的
-   cookie 是**都会发送**的，去重既丢数据又破坏 `getAll` 已排好的顺序：
+devtool 只消费记录里的 `requestCookie`，**不再读取浏览器 cookie store**：展示与解密共用
+`RequestDetail` 解析出的唯一值，保证两边不会出现两套 cookie。
 
-```ts
-export async function readCookieFromStore(url?: string): Promise<string | undefined> {
-  if (!url || !chrome.cookies?.getAll) return undefined;
-  try {
-    const cookies = await chrome.cookies.getAll({ url });
-    if (cookies.length === 0) return undefined;
-    return cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-  } catch {
-    return undefined;
-  }
-}
-```
-
-2. `RequestDetail.tsx`：优先用记录里的快照（HAR 导入时 `findCookieHeader` 已有值，天然优先）：
+1. `RequestDetail.tsx` 统一解析"当前请求自身携带的 Cookie"（抓包头优先，其次记录快照）：
 
 ```ts
-const cookieHeader = findCookieHeader(record.requestHeaders) ?? record.requestCookie;
+const requestCookie = resolveRequestCookie(record); // = 抓包头 ?? record.requestCookie
 ```
 
-  这一行同时让 `BodyTab` 的解密逻辑自动复用快照（它调用
-  `resolveCookieString(cookieHeader, requestUrl)`，有值就不再实时回查 store），
-  解密不再依赖"用户点解密那一刻"的 cookie 状态。
+   同一个 `requestCookie` 同时传给 Request Headers 的 `HeadersTab` 与 `BodyTab`：
+   - `HeadersTab` 在抓包头没有 Cookie 时展示该值并按 `cookieSource` 标注来源；
+   - `BodyTab` 解密时把它合并进载荷（`payload.body.cookie`），没有值时载荷不带 cookie。
 
-   > 顺序正确 ≠ 就是真实发送值：这里拿到的仍是 §2.5 的近似快照，UI 必须按 `cookieSource` 标注来源。
+   因此**面板 Request Headers 显示什么，解密就传什么**；旧记录（无 `requestCookie`）也保证
+   展示与解密一致（都没有 Cookie），不会把"此刻浏览器 cookie store"里的值混进历史请求。
 
-3. `HeadersTab`：请求头里没有 Cookie 时，优先展示 `record.requestCookie` 并标注来源
-   （`snapshot` → "from cookie snapshot"，`webrequest` → "from webRequest"）；
-   若 `cookieObserved === true` 且没有值，显示"no Cookie sent (from webRequest)"这一权威结论；
-   只有记录里完全没有时才回退现有的 store 懒查，保留旧记录的可用性。
-   新增的 `snapshotCookie` / 来源 props 要**设为可选**——同一组件还用于 Response Headers
-   （`RequestDetail.tsx` 第二处调用只传 `headers` / `title`）。
+2. `utils/cookies.ts` 只保留 `findCookieHeader`；`readCookieFromStore` 已删除
+   （同时消除旧实现按 name 去重导致同名多 path cookie 丢失/顺序错误的问题）。
+
+3. `HeadersTab` 新增的 props 全部可选，同一组件用于 Response Headers 时不传，行为不变。
 
 ### 2.5 精度边界（必须写进 UI 与文档，别当成真实发送值）
 
@@ -592,9 +579,9 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 | `packages/shared/src/types.ts` | `RequestRecord` 加可选 `requestCookie` / `cookieSource` / `cookiesSent` / `sentAt` |
 | `packages/background/src/cookie-snapshot.ts`（新增） | `getCookieHeaderSnapshot` / `enrichRecordsWithCookieSnapshot` + 30s 缓存 |
 | `packages/background/src/index.ts` | `REQUESTS_BATCH`、`REQUEST_CAPTURED` 先补全再入列；`IMPORT_REQUESTS` 不补全；`REQUESTS_BATCH` 保持 `return true`（异步 `sendResponse`），`REQUEST_CAPTURED` 无 `sendResponse` 则不要 `return true` |
-| `packages/devtool/src/utils/cookies.ts` | 删除按 name 去重，直接按 `getAll` 返回顺序拼接 |
-| `packages/devtool/src/components/RequestDetail.tsx` | `findCookieHeader(...) ?? record.requestCookie`；HeadersTab 传快照与来源 |
-| `packages/devtool/src/components/HeadersTab.tsx` | 无抓包头时优先展示快照并标注来源（"from cookie snapshot"），无快照才回退懒查 |
+| `packages/devtool/src/utils/cookies.ts` | 只保留 `findCookieHeader`；删除 cookie store 读取（`readCookieFromStore`），devtool 不再访问 `chrome.cookies` |
+| `packages/devtool/src/components/RequestDetail.tsx` | 统一解析 `requestCookie = findCookieHeader(...) ?? record.requestCookie`，同一个值传给 HeadersTab 展示与 BodyTab 解密 |
+| `packages/devtool/src/components/HeadersTab.tsx` | 抓包头无 Cookie 时展示传入的 `requestCookie` 并按来源标注（"from cookie snapshot" / "from webRequest"）；不再回退 store 懒查 |
 | `packages/content/src/main-world.ts` | URL 绝对化；记录 `credentials`/`withCredentials` → `cookiesSent`；补 `sentAt` |
 
 **Phase 2（B，独立提交）**

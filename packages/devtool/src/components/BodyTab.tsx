@@ -3,19 +3,19 @@
  *
  * 组成：
  *   - handleCopy      复制当前内容（解密后优先复制解密结果），用隐藏 textarea + execCommand
- *   - handleDecrypt   发送 DECRYPT_REQUEST 给 background，由其代理 POST 到外部解密服务（15s 超时）
- *   - resolveCookieString 取得原请求 cookie：优先抓包记录里的 Cookie 头（HAR 导入常见），
- *     否则用 chrome.cookies 读取原接口域名下的 cookie（浏览器自动附加的头 JS 读不到）
+ *   - handleDecrypt   发送 DECRYPT_REQUEST 给 background，由其代理 POST 到外部解密服务（15s 超时）；
+ *     载荷里的 cookie 只带当前这条请求自己的 Cookie（抓包头，或实时抓包由 background 补的
+ *     requestCookie 快照），不再实时回查 cookie store——避免把请求发生之后才变化/新增的
+ *     cookie 混进这条历史请求的解密上下文
  *   - 自动解密         mount 时若 autoDecrypt 且配置齐全则直接触发（key 重挂载保证按记录触发）
  *   - 渲染             统一交给 JsonEditor（CodeMirror 只读）：JSON 自动排序 + 高亮缩进，
  *     非 JSON 原样只读展示；解密成功后背景变黄以示区分
  *
- * 协作：RequestDetail 传入 body/decryptPayload/decryptUrl/requestUrl/cookieHeader；
+ * 协作：RequestDetail 传入 body/decryptPayload/decryptUrl/cookieHeader；
  *   解密请求经 background 中转（避免面板侧跨域限制），结果回写 decrypted 状态。
  */
 import {useEffect, useState} from "react";
 import {JsonEditor} from "./JsonEditor";
-import {resolveCookieString} from "../utils/cookies";
 
 
 interface BodyTabProps {
@@ -24,9 +24,7 @@ interface BodyTabProps {
   decryptPayload?: unknown;
   decryptUrl?: string;
   autoDecrypt?: boolean;
-  /** 原请求 URL，用于在抓包记录缺少 Cookie 头时按域名读取 cookie */
-  requestUrl?: string;
-  /** 抓包记录里的 Cookie 请求头（HAR 导入场景常见），优先使用 */
+  /** 当前请求自身携带的 Cookie（抓包头 / requestCookie 快照）；缺失时解密载荷不带 cookie */
   cookieHeader?: string;
 }
 
@@ -44,7 +42,6 @@ export default function BodyTab({
   decryptPayload,
   decryptUrl,
   autoDecrypt,
-  requestUrl,
   cookieHeader,
 }: BodyTabProps) {
   const [decrypted, setDecrypted] = useState<string | null>(null);
@@ -67,12 +64,13 @@ export default function BodyTab({
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleDecrypt = async () => {
+  const handleDecrypt = () => {
     if (!decryptUrl || !decryptPayload) return;
     setDecrypting(true);
     setDecryptError(null);
-    // 解密接口通常需要登录态 cookie：优先抓包记录，缺失时按原接口域名实时读取
-    const cookie = await resolveCookieString(cookieHeader, requestUrl);
+    // 只传当前请求自身携带的 cookie（抓包头，或 background 在入列时补的 requestCookie 快照）；
+    // 缺失时不回退 cookie store，避免把请求之后才变化/新增的 cookie 混进这条历史请求
+    const cookie = cookieHeader;
     try {
       chrome.runtime.sendMessage(
         {

@@ -4,22 +4,25 @@
  * 组成：
  *   - useStorage(ENABLED)        监控总开关（写入 storage 即被 isolated-world 感知并 patch/restore）
  *   - useStorage(CAPTURE_FILTER) 抓取过滤配置，配合 FilterConfig 面板草稿编辑（Cancel/确定）
- *   - StatusBadge                运行状态 + 已捕获计数
+ *   - useStorage(MAX_BODY_SIZE / MAX_REQUESTS)  容量限制，配合 LimitsConfig 面板（失焦/回车提交）
+ *   - StatusBadge                运行状态 + 已捕获计数（含条数上限）
  *   - 计数轮询                   每 2s 发 GET_REQUEST_COUNT 向 background 查询缓冲长度
  *   - Clear 按钮                 广播 CLEAR_REQUESTS 清空 background 缓冲与所有面板
  *   - Decrypt 设置区             AUTO_DECRYPT 开关与 DECRYPT_URL 解密服务地址
  *
  * 协作：
  *   - 配置写入 chrome.storage.sync → isolated-world onChanged → 下发 main-world 即时生效
+ *   - MAX_REQUESTS 写入后由 background onChanged 感知，立即按时间淘汰超出部分
  *   - 指令类操作（计数/清空）走 runtime.sendMessage → background onMessage
  */
 import { useEffect, useState } from 'react';
-import { STORAGE_KEYS, MESSAGE_TYPES } from '@request-monitor/shared';
-import type { CaptureFilter } from '@request-monitor/shared';
+import { DEFAULT_LIMITS, MESSAGE_TYPES, STORAGE_KEYS, normalizeLimit } from '@request-monitor/shared';
+import type { CaptureFilter, LimitConfig } from '@request-monitor/shared';
 import { useStorage } from './hooks/useStorage';
 import ToggleSwitch from './components/ToggleSwitch';
 import StatusBadge from './components/StatusBadge';
 import FilterConfig from './components/FilterConfig';
+import LimitsConfig from './components/LimitsConfig';
 
 const DEFAULT_FILTER: CaptureFilter = {
   urlPattern: '',
@@ -36,6 +39,23 @@ export default function App() {
   const [draftFilter, setDraftFilter] = useState<CaptureFilter>(DEFAULT_FILTER);
   const [decryptUrl, setDecryptUrl] = useStorage(STORAGE_KEYS.DECRYPT_URL, '');
   const [autoDecrypt, setAutoDecrypt] = useStorage(STORAGE_KEYS.AUTO_DECRYPT, true);
+  const [maxBodySize, setMaxBodySize] = useStorage<number>(STORAGE_KEYS.MAX_BODY_SIZE, DEFAULT_LIMITS.maxBodySize);
+  const [maxRequests, setMaxRequests] = useStorage<number>(STORAGE_KEYS.MAX_REQUESTS, DEFAULT_LIMITS.maxRequests);
+  const [showLimits, setShowLimits] = useState(false);
+
+  // 存储中的值可能缺失/越界（历史数据、手改 storage），统一归一化后再使用
+  const limits: LimitConfig = {
+    maxBodySize: normalizeLimit('maxBodySize', maxBodySize),
+    maxRequests: normalizeLimit('maxRequests', maxRequests),
+  };
+
+  const updateLimits = (partial: Partial<LimitConfig>) => {
+    if (partial.maxBodySize !== undefined) setMaxBodySize(partial.maxBodySize);
+    if (partial.maxRequests !== undefined) setMaxRequests(partial.maxRequests);
+  };
+
+  const hasCustomLimits =
+    limits.maxBodySize !== DEFAULT_LIMITS.maxBodySize || limits.maxRequests !== DEFAULT_LIMITS.maxRequests;
 
   useEffect(() => {
     const updateCount = () => {
@@ -71,22 +91,38 @@ export default function App() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <ToggleSwitch enabled={enabled} onChange={setEnabled} />
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            style={{
-              padding: '4px 8px',
-              border: `1px solid ${hasActiveFilters ? '#4CAF50' : '#ddd'}`,
-              borderRadius: '4px',
-              background: showFilters ? '#e3f2fd' : '#fff',
-              color: hasActiveFilters ? '#2E7D32' : '#666',
-              fontSize: '11px',
-              cursor: 'pointer',
-            }}
-          >
-            Filters {hasActiveFilters ? '●' : ''}
-          </button>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              style={{
+                padding: '4px 8px',
+                border: `1px solid ${hasActiveFilters ? '#4CAF50' : '#ddd'}`,
+                borderRadius: '4px',
+                background: showFilters ? '#e3f2fd' : '#fff',
+                color: hasActiveFilters ? '#2E7D32' : '#666',
+                fontSize: '11px',
+                cursor: 'pointer',
+              }}
+            >
+              Filters {hasActiveFilters ? '●' : ''}
+            </button>
+            <button
+              onClick={() => setShowLimits(!showLimits)}
+              style={{
+                padding: '4px 8px',
+                border: `1px solid ${hasCustomLimits ? '#4CAF50' : '#ddd'}`,
+                borderRadius: '4px',
+                background: showLimits ? '#e3f2fd' : '#fff',
+                color: hasCustomLimits ? '#2E7D32' : '#666',
+                fontSize: '11px',
+                cursor: 'pointer',
+              }}
+            >
+              Limits {hasCustomLimits ? '●' : ''}
+            </button>
+          </div>
         </div>
-        <StatusBadge enabled={enabled} count={count} />
+        <StatusBadge enabled={enabled} count={count} max={limits.maxRequests} />
         <button
           onClick={() => {
             chrome.runtime.sendMessage({ type: MESSAGE_TYPES.CLEAR_REQUESTS });
@@ -140,6 +176,9 @@ export default function App() {
               </button>
             </div>
           </>
+        )}
+        {showLimits && (
+          <LimitsConfig limits={limits} onChange={updateLimits} />
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid #eee', paddingTop: '8px' }}>
           <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>

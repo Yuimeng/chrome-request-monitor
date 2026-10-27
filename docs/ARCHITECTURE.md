@@ -13,25 +13,28 @@ chrome-request-monitor/
 │
 └── packages/
     ├── shared/                       ┌─────────────────────────────────────────┐
-    │   └── src/                      │  共享层：类型契约 + 常量（无运行时逻辑）  │
+    │   └── src/                      │  共享层：类型契约 + 常量 + 配置归一化      │
     │       ├── index.ts              │  统一出口，其他包只从包名导入            │
     │       ├── types.ts              │  RequestRecord / FilterConfig / Message │
-    │       │                         │  CaptureFilter / DecryptPayload         │
-    │       └── constants.ts          │  STORAGE_KEYS / MESSAGE_TYPES / EVENTS  │
-    │                                 │  MAX_BODY_SIZE / PORT_NAME_DEVTOOLS     │
+    │       │                         │  CaptureFilter / LimitConfig / Decrypt  │
+    │       ├── constants.ts          │  STORAGE_KEYS / MESSAGE_TYPES / EVENTS  │
+    │       │                         │  PORT_NAME_DEVTOOLS                     │
+    │       └── limits.ts             │  DEFAULT_LIMITS / LIMIT_BOUNDS          │
+    │                                 │  normalizeLimit(s)（上限默认值与边界）    │
     └── content/                      └─────────────────────────────────────────┘
         └── src/
             ├── main-world.ts         # 【页面主世界】请求 hook 层
             │   ├── patchFetch()      #   替换 window.fetch，记录请求/响应/耗时
             │   ├── patchXHR()        #   替换 XMLHttpRequest（open/header/send/loadend）
             │   ├── matchesFilter()   #   按 CaptureFilter 决定是否抓取
+            │   ├── limitBody()       #   按 maxBodySize 截断请求体/响应体并标注
             │   ├── generateId()      #   生成 UUID v4
             │   ├── restore()         #   关闭监控时还原原始实现
-            │   └── 监听 MONITOR_CONFIG 事件 → patch / restore
+            │   └── 监听 MONITOR_CONFIG 事件 → patch / restore + 更新上限
             │
             ├── isolated-world.ts     # 【隔离世界】桥梁层
             │   ├── injectMainScript()      # <script> 注入 main-world 到页面
-            │   ├── loadConfig()            # 读 storage.sync 配置
+            │   ├── loadConfig()            # 读 storage.sync 配置（含 MAX_BODY_SIZE）
             │   ├── dispatchConfig()        # CustomEvent 下发配置给 main-world
             │   ├── pendingBuffer/flushBuffer  # 上报缓冲：攒批 + SW 休眠重试
             │   └── handleStorageChange()   # 配置变更实时转发
@@ -39,11 +42,14 @@ chrome-request-monitor/
     ├── background/
     │   └── src/                      # 【Service Worker】消息中枢 + 数据缓冲
     │       ├── index.ts              #   消息路由、入列队列、解密代理、面板推送
-    │       │   ├── requestBuffer         #   内存缓冲（≤500 条，session 持久化）
+    │       │   ├── requestBuffer         #   内存缓冲（≤maxRequests，默认 500，session 持久化）
+    │       │   ├── enforceCapacity()     #   超出上限按 sentAt 淘汰最早记录，返回被淘汰 id
     │       │   ├── ingestRecords()       #   串行入列：先补 Cookie 快照再 push/broadcast/persist
-    │       │   ├── mergeRecords()        #   批量并入缓冲 + 广播 + 持久化
+    │       │   ├── mergeRecords()        #   批量并入缓冲 + 广播 + 淘汰 + 持久化
     │       │   ├── broadcastToDevTools() #   向所有 DevTools 面板实时推送
-    │       │   ├── persist/restoreBuffer #   chrome.storage.session 写入/恢复
+    │       │   ├── broadcastEvicted()    #   广播 REQUESTS_EVICTED，面板同步移除
+    │       │   ├── persist/restoreBuffer #   chrome.storage.session 写入/恢复（配额不足折半）
+    │       │   ├── loadMaxRequests()     #   读 storage.sync 的 MAX_REQUESTS（onChanged 即时收缩）
     │       │   ├── handleDecrypt()       #   代理 POST 到外部解密服务（带超时）
     │       │   ├── onMessage             #   消息路由：抓取/批量/查询/解密/导入/清空
     │       │   └── onConnect             #   DevTools Port 接入，连接时回放全量
@@ -57,7 +63,7 @@ chrome-request-monitor/
     │       ├── panel.tsx             │  React 挂载点                           │
     │       ├── App.tsx               │  根组件：布局编排 + 拖拽导入 + 分栏拖宽   │
     │       ├── hooks/                │  ─────────────────────────────────────  │
-    │       │   ├── useRequests.ts    │  Port 长连接数据源（断线自动重连）        │
+    │       │   ├── useRequests.ts    │  Port 长连接数据源（断线重连 + 淘汰同步）  │
     │       │   ├── useFilter.ts      │  展示层过滤（url/method/status/type）    │
     │       │   └── useStorage.ts     │  storage.sync 响应式读写                │
     │       ├── components/           │  ─────────────────────────────────────  │
@@ -81,8 +87,9 @@ chrome-request-monitor/
             ├── hooks/useStorage.ts   │  storage.sync 响应式读写                │
             └── components/           │  ─────────────────────────────────────  │
                 ├── ToggleSwitch.tsx  │  监控总开关                             │
-                ├── StatusBadge.tsx   │  运行状态 + 捕获计数                     │
-                └── FilterConfig.tsx  │  抓取过滤表单（URL/类型/方法）           │
+                ├── StatusBadge.tsx   │  运行状态 + 捕获计数 / 条数上限           │
+                ├── FilterConfig.tsx  │  抓取过滤表单（URL/类型/方法）           │
+                └── LimitsConfig.tsx  │  容量限制表单（body 上限/条数上限）      │
 ```
 
 ---
@@ -101,9 +108,11 @@ chrome-request-monitor/
 ├──────────── Service Worker ──────────────┤
 │ background: ingestRecords（串行入列）       │
 │   ├─ enrichRecords：chrome.cookies 补 Cookie│
-│   ├─ requestBuffer (≤500)                 │
+│   ├─ requestBuffer (≤maxRequests)         │
+│   ├─ enforceCapacity：按时间淘汰最早记录    │
 │   ├─ persist → chrome.storage.session     │
-│   └─ broadcast → DevTools Port            │
+│   ├─ broadcast → DevTools Port            │
+│   └─ broadcastEvicted → REQUESTS_EVICTED  │
 ├──────────── UI 层 ───────────────────────┤
 │ devtool: useRequests(Port) → 表格/详情    │
 │ popup:   GET_REQUEST_COUNT 轮询计数       │
@@ -111,7 +120,8 @@ chrome-request-monitor/
 
 配置流（反向，实时生效）：
 popup 写 storage.sync → isolated-world onChanged
-  → CustomEvent(MONITOR_CONFIG) → main-world patch/restore
+  → CustomEvent(MONITOR_CONFIG) → main-world patch/restore + 更新 maxBodySize
+popup 写 MAX_REQUESTS → background onChanged → 立即淘汰超出部分
 ```
 
 ### 通信方式一览
@@ -121,7 +131,7 @@ popup 写 storage.sync → isolated-world onChanged
 | `CustomEvent`（页面事件） | 跨世界传递配置与捕获结果 | main-world ↔ isolated-world |
 | `chrome.runtime.sendMessage` | 一次性指令/请求（计数、清空、解密、批量上报） | content / popup / devtool → background |
 | `chrome.runtime.Port`（长连接） | 实时增量推送 + 全量回放 | background ↔ devtool |
-| `chrome.storage.sync` | 持久配置（开关、过滤、解密地址） | popup 写 → content/devtool 读 |
+| `chrome.storage.sync` | 持久配置（开关、过滤、容量上限、解密地址） | popup 写 → content/devtool/background 读 |
 | `chrome.storage.session` | 会话级请求缓冲（SW 重启可恢复） | background 读写 |
 
 ---
@@ -135,7 +145,7 @@ popup 写 storage.sync → isolated-world onChanged
 | `content/isolated-world` | 内容脚本隔离世界 | 注入 main 脚本、读写配置、缓冲并转发捕获结果 |
 | `background` | Service Worker（可被休眠） | 消息路由、数据缓冲与持久化、解密代理、面板推送 |
 | `devtool` | DevTools 面板 | 列表展示、过滤、详情查看、HAR 导入、解密展示 |
-| `popup` | 浏览器弹窗 | 监控开关、抓取过滤配置、计数与清空、解密配置 |
+| `popup` | 浏览器弹窗 | 监控开关、抓取过滤与容量上限配置、计数与清空、解密配置 |
 
 ### 关键设计要点
 
@@ -151,5 +161,15 @@ popup 写 storage.sync → isolated-world onChanged
 6. **Cookie 补充（方案 A）**：页面 JS 读不到浏览器注入的 Cookie（forbidden request header），
    background 在记录入列前用 `chrome.cookies.getAll({ url })` 生成近似快照（30s 缓存 + 1s 超时），
    content 侧同时记录 `cookiesSent`（credentials 语义）用于跳过明显不带 Cookie 的请求；
-   devtool 优先展示记录快照并标注来源（`cookieSource`），HAR 导入仍以抓包头为准。
+   devtool 优先展示记录快照并标注来源（`cookieSource`），HAR 导入仍以抓包头为准，
+   且展示与解密共用同一个 `requestCookie` 值（devtool 不再读取 cookie store）。
    设计细节见 `docs/cookie-capture.md`（Phase 2 的 webRequest 权威读取尚未实现）。
+7. **容量双闸门**：两个上限分别在"产生端"和"汇聚端"生效，避免任一环节撑爆内存或配额。
+   - `maxBodySize`（默认 1,000,000 字符）在 main-world 生效：请求体与响应体各自计算，
+     超限保留前缀并追加 `…[truncated N chars]`，比整段丢弃更利于排错；
+   - `maxRequests`（默认 500）在 background 生效：每次入列/导入/恢复后按
+     `sentAt ?? startTime` 淘汰最早的记录，`storage.session` 只写入上限内的最近记录，
+     配额不足时折半重试；
+   - 淘汰后通过 `REQUESTS_EVICTED` 广播 id，devtool 同步移除，避免面板与后台计数漂移；
+   - 两个上限都由 popup 的 `Limits` 面板配置（`LIMIT_BOUNDS` 限定合法区间），
+     写入 `storage.sync` 后即时生效，无需重载扩展。

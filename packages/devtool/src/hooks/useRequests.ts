@@ -5,6 +5,8 @@
  *   - Port 长连接（connect）      连接 background，接收全量回放（CAPTURED_REQUESTS_RESPONSE）、
  *     增量推送（REQUEST_CAPTURED）与清空指令（CLEAR_REQUESTS）
  *   - 断线重连（onDisconnect）     Service Worker 休眠会导致连接断开，500ms 后自动重连并重新回放
+ *   - REQUESTS_EVICTED 处理       background 因超出条数上限淘汰记录时，按 id 从本地列表移除，
+ *     保证面板列表与后台缓冲一致（上限在 popup 配置，默认 500 条）
  *   - clearRequests / importRequests  本地清空、导入 HAR（同时把记录同步给 background 持久化）
  *
  * 协作：App 调用本 Hook 获取 requests 列表；数据源头是 content 捕获、经 background 广播的记录。
@@ -34,6 +36,12 @@ export function useRequests() {
           case MESSAGE_TYPES.REQUEST_CAPTURED:
             setRequests(prev => [...prev, message.data as RequestRecord]);
             break;
+          case MESSAGE_TYPES.REQUESTS_EVICTED: {
+            // 超出条数上限被后台淘汰的记录：同步移除，避免面板无限增长
+            const evicted = new Set(message.ids as string[]);
+            setRequests(prev => prev.filter(record => !evicted.has(record.id)));
+            break;
+          }
           case MESSAGE_TYPES.CLEAR_REQUESTS:
             setRequests([]);
             break;

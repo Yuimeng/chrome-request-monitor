@@ -3,6 +3,7 @@
  *
  * 组成：
  *   - matchesFilter   依 CaptureFilter 判断单个请求是否需要抓取（类型开关/URL 关键字/HTTP 方法）
+ *   - limitBody       按配置的 body 上限截断文本（超限保留前缀 + 截断标记）
  *   - generateId      生成 UUID v4 作为请求记录 id
  *   - patchFetch      替换 window.fetch：记录方法/URL/头/体/耗时/响应，构造 RequestRecord
  *   - patchXHR        替换 window.XMLHttpRequest：hook open/setRequestHeader/send，
@@ -13,19 +14,29 @@
  * 协作：
  *   - 由 isolated-world 注入到页面；只能通过 CustomEvent 与外界通信（无 chrome.* 权限）：
  *     接收 EVENTS.MONITOR_CONFIG（配置），发送 EVENTS.REQUEST_CAPTURED（捕获结果）
- *   - 响应体仅在 content-type 含 text/json 且 ≤ MAX_BODY_SIZE(1MB) 时记录
+ *   - 请求体/响应体各自受 maxBodySize 限制（默认 1MB，popup 可配），超限截断并追加标记
  *   - fetch 失败（网络错误）也会记录，status 记为 0
  *   - 方案 A+（Cookie 捕获降误报）：URL 统一绝对化为 document.baseURI 基准，并记录
  *     cookiesSent（本次请求发送语义上是否带 Cookie）与 sentAt（墙钟发送时刻）两个可选字段
  */
-import { EVENTS, MAX_BODY_SIZE } from "@request-monitor/shared";
+import { DEFAULT_LIMITS, EVENTS } from "@request-monitor/shared";
 import type { CaptureFilter } from "@request-monitor/shared";
 
 let fetchActive = false;              // 是否已 patch fetch（防止重复 patch）
 let xhrActive = false;                // 是否已 patch XHR
 let currentFilter: CaptureFilter = { urlPattern: "", captureFetch: true, captureXHR: true, methods: [] };
+// 单条 body 上限（字符数）：由 popup 配置，isolated-world 随配置下发；请求体与响应体各自计算
+let maxBodySize = DEFAULT_LIMITS.maxBodySize;
 let originalFetch: typeof window.fetch;      // 备份的原始 fetch，用于 restore
 let originalXHR: typeof window.XMLHttpRequest;
+
+// 按上限截断 body：保留前缀并标注被裁掉的字符数，
+// 相比整段丢弃既保住排错信息，又让内存/存储占用有界
+function limitBody(text: string | undefined): string | undefined {
+  if (text === undefined) return undefined;
+  if (text.length <= maxBodySize) return text;
+  return `${text.slice(0, maxBodySize)}\n…[truncated ${text.length - maxBodySize} chars]`;
+}
 
 // 抓取过滤：三个维度全部通过才捕获（类型开关 → URL 子串 → 方法白名单）
 function matchesFilter(method: string, url: string, type: "fetch" | "xhr"): boolean {
@@ -123,7 +134,7 @@ function patchFetch() {
     let requestBody: string | undefined;
     if (init?.body) {
       requestBody =
-        typeof init.body === "string" ? init.body : "[non-text body]";
+        typeof init.body === "string" ? limitBody(init.body) : "[non-text body]";
     }
 
     try {
@@ -134,10 +145,7 @@ function patchFetch() {
       const contentType = response.headers.get("content-type") || "";
       if (contentType.includes("text") || contentType.includes("json")) {
         const cloned = response.clone();
-        const text = await cloned.text();
-        if (text.length <= MAX_BODY_SIZE) {
-          responseBody = text;
-        }
+        responseBody = limitBody(await cloned.text());
       }
 
       // 成功路径：命中过滤则派发捕获事件给 isolated-world（status 为真实响应码）
@@ -229,7 +237,7 @@ function patchXHR() {
 
     const originalSend = xhr.send.bind(xhr);
     xhr.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
-      requestBody = typeof body === "string" ? body : undefined;
+      requestBody = typeof body === "string" ? limitBody(body) : undefined;
 
       // 发送语义判定（方案 A+）：必须在 send 处读取 withCredentials——页面可能在 open 之后、
       // send 之前设置它，构造函数/send 之前的任何时刻读到的值都不可靠。
@@ -247,9 +255,7 @@ function patchXHR() {
           (contentType.includes("text") || contentType.includes("json")) &&
           xhr.responseText
         ) {
-          if (xhr.responseText.length <= MAX_BODY_SIZE) {
-            responseBody = xhr.responseText;
-          }
+          responseBody = limitBody(xhr.responseText);
         }
 
         const responseHeaders: [string, string][] = [];
@@ -314,9 +320,12 @@ function restore() {
   }
 }
 
-// 配置入口：isolated-world 下发的开关与过滤规则；enabled=true 打补丁，false 还原
+// 配置入口：isolated-world 下发的开关、过滤规则与 body 上限；enabled=true 打补丁，false 还原
 window.addEventListener(EVENTS.MONITOR_CONFIG, ((event: CustomEvent) => {
   currentFilter = event.detail.filter ?? currentFilter;
+  if (typeof event.detail.maxBodySize === "number") {
+    maxBodySize = event.detail.maxBodySize;
+  }
   if (event.detail.enabled) {
     patchFetch();
     patchXHR();

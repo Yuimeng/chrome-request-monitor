@@ -6,6 +6,7 @@
  *   - FilterConfig    DevTools 面板的展示过滤条件（url/method/status/type）
  *   - AppConfig       全局开关配置（enabled）
  *   - CaptureFilter   抓取过滤配置（在 content 侧生效，决定哪些请求被捕获）
+ *   - LimitConfig     容量限制配置（body 上限在 content 生效，条数上限在 background 生效）
  *   - Message         background 消息协议的可辨识联合类型（请求/响应/指令）
  *   - DecryptPayload  转发给外部解密服务的载荷（url/body/headers/timeoutMs）
  *
@@ -58,6 +59,17 @@ export interface CaptureFilter {
   methods: string[];
 }
 
+/**
+ * 容量限制配置（popup 编辑，chrome.storage.sync 持久化）
+ * 两个上限各自独立生效：body 上限控制单条记录体积，条数上限控制缓冲总量。
+ */
+export interface LimitConfig {
+  /** 单条记录 body（请求体、响应体各自计算）允许的最大字符数，超出部分截断 */
+  maxBodySize: number;
+  /** background 缓冲最多保留的记录条数，超出后按时间淘汰最早的记录 */
+  maxRequests: number;
+}
+
 export type Message =
   | { type: 'REQUEST_CAPTURED'; data: RequestRecord }
   | { type: 'GET_CAPTURED_REQUESTS' }
@@ -68,7 +80,9 @@ export type Message =
   | { type: 'DECRYPT_RESPONSE'; success: boolean; data?: string; error?: string }
   | { type: 'CLEAR_REQUESTS' }
   | { type: 'IMPORT_REQUESTS'; data: RequestRecord[] }
-  | { type: 'REQUESTS_BATCH'; data: RequestRecord[] };
+  | { type: 'REQUESTS_BATCH'; data: RequestRecord[] }
+  // background 因超出条数上限淘汰了记录，面板需按 id 同步移除
+  | { type: 'REQUESTS_EVICTED'; ids: string[] };
 
 export interface DecryptPayload {
   url: string;
