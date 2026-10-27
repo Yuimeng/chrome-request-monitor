@@ -59,16 +59,21 @@ function parseUrlParams(url: string): Record<string, string> {
   }
 }
 
-const TABS = [
-  "Request Body",
-  "Response Body",
-  "General",
-  "Request Headers",
-  "Response Headers",
+// 主标签 + Request/Response 子切换：5 个长标签在 300px 窄面板下必然溢出，
+// 之前靠横向滚动兜底，滚动条会压住 30px 标签栏并裁掉激活态下划线。
+// 拆成 3 个主标签 + 2 个子切换后总宽度恒定可控，任何宽度都不再产生滚动。
+const SECTIONS = [
+  { key: 'body', label: 'Body', title: 'Request / Response Body' },
+  { key: 'headers', label: 'Headers', title: 'Request / Response Headers' },
+  { key: 'general', label: 'General', title: 'General' },
 ] as const;
 
+type Section = (typeof SECTIONS)[number]['key'];
+type Side = 'request' | 'response';
+
 export default function RequestDetail({ record, decryptUrl, onClose }: RequestDetailProps) {
-  const [activeTab, setActiveTab] = useState<string>("Request Body");
+  const [section, setSection] = useState<Section>('body');
+  const [side, setSide] = useState<Side>('request');
   const [autoDecrypt] = useStorage(STORAGE_KEYS.AUTO_DECRYPT, true);
   let requestBody, responseBody;
   try {
@@ -78,56 +83,64 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
     //
   }
   // 当前请求自身携带的 Cookie：抓包头（HAR 导入 / 页面显式设置）优先，其次实时抓包时
-  // background 在入列前补的 requestCookie 快照。展示与解密共用这一个值，devtool 不再读
+  // background 在入列前补的 requestCookie 快照。展示与解密共用这一个值，devtools 不再读
   // 浏览器 cookie store，避免面板显示与解密载荷出现两套 cookie。
   const requestCookie = resolveRequestCookie(record);
   const capturedCookie = findCookieHeader(record.requestHeaders);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
-      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #ddd', background: '#fafafa' }}>
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: '8px 12px',
-              border: 'none',
-              borderBottom: activeTab === tab ? '2px solid #1976D2' : '2px solid transparent',
-              background: activeTab === tab ? '#fff' : 'transparent',
-              cursor: 'pointer',
-              fontSize: '12px',
-              color: activeTab === tab ? '#1976D2' : '#666',
-              fontWeight: activeTab === tab ? 600 : 400,
-            }}
-          >
-            {tab}
-          </button>
-        ))}
-        <div style={{ flex: 1 }} />
+    <div className="detail-pane">
+      <div className="detail-tabs">
+        <div className="detail-tabs-group" role="tablist">
+          {SECTIONS.map(({ key, label, title }) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={section === key}
+              title={title}
+              onClick={() => setSection(key)}
+              className={section === key ? 'tab is-active' : 'tab'}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {section !== 'general' && (
+          <div className="side-toggle" role="group" aria-label="Request or response">
+            <button
+              type="button"
+              className={side === 'request' ? 'side-btn is-active' : 'side-btn'}
+              aria-pressed={side === 'request'}
+              onClick={() => setSide('request')}
+            >
+              Request
+            </button>
+            <button
+              type="button"
+              className={side === 'response' ? 'side-btn is-active' : 'side-btn'}
+              aria-pressed={side === 'response'}
+              onClick={() => setSide('response')}
+            >
+              Response
+            </button>
+          </div>
+        )}
+
+        <div className="tab-spacer" />
         {onClose && (
-          <button
-            onClick={onClose}
-            title="Close"
-            style={{
-              marginRight: '8px',
-              padding: '2px 8px',
-              border: 'none',
-              borderRadius: '4px',
-              background: 'transparent',
-              cursor: 'pointer',
-              fontSize: '24px',
-              color: '#999',
-              lineHeight: 1,
-            }}
-          >
-            ×
+          <button type="button" className="icon-btn" onClick={onClose} title="Close panel" aria-label="Close panel">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
           </button>
         )}
       </div>
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        {activeTab === 'General' && <GeneralTab record={record} />}
-        {activeTab === 'Request Headers' && (
+      <div className="detail-body">
+        {section === 'general' && <GeneralTab record={record} />}
+
+        {section === 'headers' && (side === 'request' ? (
           <HeadersTab
             headers={record.requestHeaders}
             title="Request Headers"
@@ -135,9 +148,11 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
             cookieSource={capturedCookie ? undefined : record.cookieSource}
             cookieObserved={capturedCookie || requestCookie ? undefined : record.cookieObserved}
           />
-        )}
-        {activeTab === 'Response Headers' && <HeadersTab headers={record.responseHeaders} title="Response Headers" />}
-        {activeTab === 'Request Body' && (
+        ) : (
+          <HeadersTab headers={record.responseHeaders} title="Response Headers" />
+        ))}
+
+        {section === 'body' && (side === 'request' ? (
           <BodyTab
             key={record.id + '-request'}
             body={record.requestBody}
@@ -147,8 +162,7 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
             cookieHeader={requestCookie}
             autoDecrypt={autoDecrypt}
           />
-        )}
-        {activeTab === 'Response Body' && (
+        ) : (
           <BodyTab
             key={record.id + '-response'}
             body={record.responseBody}
@@ -158,7 +172,7 @@ export default function RequestDetail({ record, decryptUrl, onClose }: RequestDe
             cookieHeader={requestCookie}
             autoDecrypt={autoDecrypt}
           />
-        )}
+        ))}
       </div>
     </div>
   );

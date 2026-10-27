@@ -76,39 +76,32 @@ export default function HeadersTab({
 
   if (rows.length === 0) {
     return (
-      <p style={{ padding: '12px', color: '#999', fontSize: '12px' }}>
+      <p className="placeholder">
         No {title.toLowerCase()} available
       </p>
     );
   }
 
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+    <table className="headers">
       <thead>
-        <tr style={{ background: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
-          <th style={{ padding: '6px 12px', textAlign: 'left', color: '#666', width: '250px' }}>Name</th>
-          <th style={{ padding: '6px 12px', textAlign: 'left', color: '#666' }}>Value</th>
+        <tr>
+          <th className="col-name" scope="col">Name</th>
+          <th scope="col">Value</th>
         </tr>
       </thead>
       <tbody>
         {rows.map(({ name, value, synthesized, sourceLabel, sourceTitle, observedAbsent }, i) => (
-          <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
-            <td style={{ padding: '4px 12px', color: '#8B4513', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-              {name}
-            </td>
-            <td style={{ padding: '4px 12px', color: '#333', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+          <tr key={i}>
+            <td className="name">{name}</td>
+            <td className="value">
               {observedAbsent ? (
-                <span style={{ color: '#999', fontStyle: 'italic', fontFamily: 'inherit' }}>
-                  no Cookie sent (from webRequest)
-                </span>
+                <span className="value-absent">no Cookie sent (from webRequest)</span>
               ) : (
                 <>
                   {value}
                   {synthesized && sourceLabel && (
-                    <span
-                      title={sourceTitle}
-                      style={{ marginLeft: 8, fontSize: 10, color: '#999', whiteSpace: 'nowrap' }}
-                    >
+                    <span className="source-tag" title={sourceTitle}>
                       {sourceLabel}
                     </span>
                   )}

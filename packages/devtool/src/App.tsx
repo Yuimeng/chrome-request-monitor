@@ -6,14 +6,14 @@
  *   - useFilter     展示过滤
  *   - Toolbar       顶部工具栏（过滤条件、清空、导入 HAR）
  *   - RequestTable  左侧虚拟滚动请求列表
- *   - RequestDetail 右侧详情面板（可拖拽调宽，detailWidth 300~800px）
+ *   - RequestDetail 右侧详情面板（可拖拽调宽，默认 60% 面板宽，范围 320px ~ 面板宽-220px）
  *   - StatusBar     底部计数状态栏
  *   - 拖拽导入      dragenter/leave/over/drop 四个 handler + dragCounter 解决子元素
  *     触发 leave 导致的误判；drop 后经 parseHar 导入
  *
  * 协作：向下分发数据与回调；decryptUrl 从 storage 读取后传给 RequestDetail 用于解密。
  */
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { RequestRecord } from "@request-monitor/shared";
 import { MESSAGE_TYPES, STORAGE_KEYS } from "@request-monitor/shared";
 import { useRequests } from "./hooks/useRequests";
@@ -25,15 +25,36 @@ import RequestTable from "./components/RequestTable";
 import RequestDetail from "./components/RequestDetail";
 import StatusBar from "./components/StatusBar";
 
+// 详情面板宽度策略：默认占面板 60%，拖拽范围 [320, 面板宽 - 220]
+// 上限不再固定 800px——宽屏下用户可以把右侧拉得更宽看长 Cookie / JSON，
+// 同时始终为左侧列表保留至少 220px，避免拖到列表完全不可用。
+const MIN_DETAIL_WIDTH = 320;
+const MIN_TABLE_WIDTH = 220;
+const DEFAULT_DETAIL_RATIO = 0.6;
+
+function clampDetailWidth(width: number): number {
+  const max = Math.max(MIN_DETAIL_WIDTH, window.innerWidth - MIN_TABLE_WIDTH);
+  return Math.min(Math.max(MIN_DETAIL_WIDTH, Math.round(width)), max);
+}
+
 export default function App() {
   const { requests, clearRequests, importRequests } = useRequests();
-  const { filteredRequests, filters, setFilters } = useFilter(requests);
+  const { filteredRequests, filters, setFilters, sort, setSort } = useFilter(requests);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [decryptUrl] = useStorage(STORAGE_KEYS.DECRYPT_URL, "");
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounter = useRef(0);
-  const [detailWidth, setDetailWidth] = useState(500);
+  const [detailWidth, setDetailWidth] = useState(() =>
+    clampDetailWidth(window.innerWidth * DEFAULT_DETAIL_RATIO),
+  );
   const isResizing = useRef(false);
+
+  // 面板/窗口尺寸变化（DevTools 停靠切换、分屏）时重新收敛宽度，避免右栏超出可视区
+  useEffect(() => {
+    const handleWindowResize = () => setDetailWidth((width) => clampDetailWidth(width));
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, []);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -43,8 +64,7 @@ export default function App() {
 
     const handleMove = (e: MouseEvent) => {
       if (!isResizing.current) return;
-      const newWidth = Math.max(300, Math.min(800, startW + (startX - e.clientX)));
-      setDetailWidth(newWidth);
+      setDetailWidth(clampDetailWidth(startW + (startX - e.clientX)));
     };
 
     const handleUp = () => {
@@ -119,78 +139,46 @@ export default function App() {
 
   return (
     <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        fontFamily: "system-ui, sans-serif",
-        position: "relative",
-      }}
+      className="app"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <Toolbar filters={filters} onFilterChange={setFilters} onClear={handleClear} onImport={importRequests} />
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <Toolbar
+        filters={filters}
+        onFilterChange={setFilters}
+        sort={sort}
+        onSortChange={setSort}
+        onClear={handleClear}
+        onImport={importRequests}
+      />
+      <div className="workspace">
         <RequestTable
           requests={filteredRequests}
           selectedId={selectedId}
           onSelect={handleSelect}
+          scrollResetKey={`${sort.key}:${sort.direction}`}
           style={selectedId ? { flex: "1 1 400px", minWidth: 200 } : undefined}
         />
         {selectedRecord && (
           <>
-            <div
-              onMouseDown={handleResizeStart}
-              style={{
-                width: "5px",
-                cursor: "col-resize",
-                flexShrink: 0,
-                background: "transparent",
-              }}
-            />
-            <div
-              style={{
-                width: detailWidth,
-                flex: "none",
-                borderLeft: "1px solid #ddd",
-                overflow: "auto",
-              }}
-            >
+            <div className="resizer" onMouseDown={handleResizeStart} />
+            <div className="detail" style={{ width: detailWidth }}>
               <RequestDetail record={selectedRecord} decryptUrl={decryptUrl} onClose={() => setSelectedId(null)} />
             </div>
           </>
         )}
       </div>
-      <StatusBar total={requests.length} filtered={filteredRequests.length} />
+      <StatusBar total={requests.length} filtered={filteredRequests.length} selected={selectedRecord} />
       {isDragOver && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(33, 150, 243, 0.08)",
-            border: "3px dashed #1976D2",
-            borderRadius: "8px",
-            margin: "8px",
-            pointerEvents: "none",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "20px",
-              fontWeight: 600,
-              color: "#1976D2",
-              background: "#fff",
-              padding: "12px 24px",
-              borderRadius: "8px",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
-            }}
-          >
+        <div className="drop-overlay">
+          <span className="drop-card">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 16V4" />
+              <path d="m7 9 5-5 5 5" />
+              <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+            </svg>
             Drop HAR file to import
           </span>
         </div>

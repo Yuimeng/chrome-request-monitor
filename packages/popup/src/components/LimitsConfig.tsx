@@ -21,29 +21,6 @@ interface LimitsConfigProps {
 // 表单以 KB 展示 body 上限，内部按字符数存储（1 KB = 1000 字符）
 const CHARS_PER_KB = 1000;
 
-const labelStyle = {
-  display: 'block',
-  color: '#666',
-  marginBottom: '4px',
-  fontSize: '12px',
-} as const;
-
-const inputStyle = {
-  width: '100%',
-  padding: '5px 8px',
-  border: '1px solid #ddd',
-  borderRadius: '4px',
-  fontSize: '12px',
-  fontFamily: 'monospace',
-  boxSizing: 'border-box',
-} as const;
-
-const hintStyle = {
-  fontSize: '11px',
-  color: '#999',
-  marginTop: '2px',
-} as const;
-
 export default function LimitsConfig({ limits, onChange }: LimitsConfigProps) {
   const [bodyDraft, setBodyDraft] = useState(String(Math.round(limits.maxBodySize / CHARS_PER_KB)));
   const [requestsDraft, setRequestsDraft] = useState(String(limits.maxRequests));
@@ -91,22 +68,14 @@ export default function LimitsConfig({ limits, onChange }: LimitsConfigProps) {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '10px',
-      padding: '10px 12px',
-      background: '#f9f9f9',
-      borderRadius: '8px',
-      fontSize: '13px',
-    }}>
-      <div style={{ fontWeight: 600, color: '#555', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        Limits
-      </div>
+    <div className="panel">
+      <div className="panel-title">Storage limits</div>
 
-      <div>
-        <label style={labelStyle}>Max Body Size (KB)</label>
+      <div className="field">
+        <label className="field-label" htmlFor="max-body-size">Max body size (KB)</label>
         <input
+          id="max-body-size"
+          className="text-input"
           type="number"
           min={LIMIT_BOUNDS.maxBodySize.min / CHARS_PER_KB}
           max={LIMIT_BOUNDS.maxBodySize.max / CHARS_PER_KB}
@@ -115,16 +84,17 @@ export default function LimitsConfig({ limits, onChange }: LimitsConfigProps) {
           onChange={(e) => setBodyDraft(e.target.value)}
           onBlur={commitBody}
           onKeyDown={submitOnEnter}
-          style={inputStyle}
         />
-        <div style={hintStyle}>
-          请求体 / 响应体各自上限，超出截断 · 1 KB = 1000 字符
+        <div className="hint">
+          Per request/response body · 1 KB = 1000 chars
         </div>
       </div>
 
-      <div>
-        <label style={labelStyle}>Max Requests</label>
+      <div className="field">
+        <label className="field-label" htmlFor="max-requests">Max requests</label>
         <input
+          id="max-requests"
+          className="text-input"
           type="number"
           min={LIMIT_BOUNDS.maxRequests.min}
           max={LIMIT_BOUNDS.maxRequests.max}
@@ -133,10 +103,9 @@ export default function LimitsConfig({ limits, onChange }: LimitsConfigProps) {
           onChange={(e) => setRequestsDraft(e.target.value)}
           onBlur={commitRequests}
           onKeyDown={submitOnEnter}
-          style={inputStyle}
         />
-        <div style={hintStyle}>
-          超出后按发送时间清除最早的请求 · {LIMIT_BOUNDS.maxRequests.min}–{LIMIT_BOUNDS.maxRequests.max}
+        <div className="hint">
+          Oldest requests are dropped first · {LIMIT_BOUNDS.maxRequests.min}–{LIMIT_BOUNDS.maxRequests.max}
         </div>
       </div>
     </div>

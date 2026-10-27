@@ -5,9 +5,10 @@
  *   - formatDuration  耗时格式化（<1ms / ms / 秒）
  *   - formatTime      时间戳 → HH:MM:SS.mmm
  *   - formatUrl       URL → 路径+查询串（列表显示）/ 完整 URL（悬浮提示）
- *   - getDurationColor / getStatusColor  耗时与状态码的红黄绿配色规则
+ *   - statusTone / durationTone  状态码与耗时的语义分级（由 CSS 类着色，不在 JS 里写死颜色）
  *
- * 协作：被 RequestTable、GeneralTab、StatusBar 等展示组件复用。
+ * 协作：被 RequestTable、GeneralTab、StatusBar 等展示组件复用；
+ *   颜色统一交给 App.css 的 .status-* / .value-* 类，便于整体换肤。
  */
 export function formatDuration(ms: number): string {
   if (ms < 1) return '<1ms';
@@ -29,15 +30,19 @@ export function formatUrl(url: string): { pathname: string; full: string } {
   }
 }
 
-export function getDurationColor(ms: number): string {
-  if (ms < 200) return '#4CAF50';
-  if (ms < 500) return '#FF9800';
-  return '#F44336';
+export type Tone = 'ok' | 'warn' | 'error' | 'none';
+
+/** 状态码分级：2xx 正常 / 3xx 提示 / 4xx-5xx 异常 / 0 无响应 */
+export function statusTone(status: number): Tone {
+  if (!status) return 'none';
+  if (status < 300) return 'ok';
+  if (status < 400) return 'warn';
+  return 'error';
 }
 
-export function getStatusColor(status: number): string {
-  if (status === 0) return '#999';
-  if (status < 300) return '#4CAF50';
-  if (status < 400) return '#FF9800';
-  return '#F44336';
+/** 耗时分级的阈值与状态码不同（200ms / 500ms），单独判定 */
+export function durationTone(ms: number): Tone {
+  if (ms < 200) return 'ok';
+  if (ms < 500) return 'warn';
+  return 'error';
 }

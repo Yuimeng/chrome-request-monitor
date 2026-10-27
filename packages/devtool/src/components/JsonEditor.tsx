@@ -47,31 +47,31 @@ function formatJson(content: string): string {
 const readOnlyTheme = EditorView.theme({
   "&": {
     height: "100%",
-    backgroundColor: "var(--json-bg, #fafafa)",
-    fontSize: "11px",
-    color: "#333",
+    backgroundColor: "var(--json-bg, #fbfcfe)",
+    fontSize: "11.5px",
+    color: "#1f2937",
   },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": {
     fontFamily:
       '"code-font", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    lineHeight: "1.5",
+    lineHeight: "1.65",
     // 不换行：超长单行靠横向滚动条查看
     overflow: "auto",
   },
   ".cm-content": {
-    padding: "8px 0",
+    padding: "10px 0",
     whiteSpace: "pre",
     wordBreak: "normal",
     overflowWrap: "normal",
   },
   ".cm-gutters": {
     // 必须是不透明底色：横向滚动时代码行会从行号下方经过，透明底会露字
-    backgroundColor: "var(--json-bg, #fafafa)",
+    backgroundColor: "var(--json-bg, #fbfcfe)",
     border: "none",
-    color: "#bbb",
+    color: "#b6c0cf",
   },
-  ".cm-lineNumbers .cm-gutterElement": { padding: "0 8px 0 4px" },
+  ".cm-lineNumbers .cm-gutterElement": { padding: "0 10px 0 6px" },
   ".cm-activeLine": { backgroundColor: "transparent" },
   ".cm-activeLineGutter": { backgroundColor: "transparent" },
   // 搜索命中：默认样式（半透明淡黄）在浅色底上几乎看不出来，这里改成实色 + 描边
@@ -87,6 +87,7 @@ const readOnlyTheme = EditorView.theme({
     outline: "2px solid #c2410c",
     borderRadius: "2px",
   },
+  ".cm-selectionBackground, ::selection": { backgroundColor: "#dbeafe" },
 });
 
 interface JsonEditorProps {
@@ -95,7 +96,7 @@ interface JsonEditorProps {
   background?: string;
 }
 
-export const JsonEditor = ({ content, background = "#fafafa" }: JsonEditorProps) => {
+export const JsonEditor = ({ content, background = "#fbfcfe" }: JsonEditorProps) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 

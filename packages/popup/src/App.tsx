@@ -2,13 +2,14 @@
  * 模块：popup / App —— 弹窗根组件（监控开关与全局配置）
  *
  * 组成：
- *   - useStorage(ENABLED)        监控总开关（写入 storage 即被 isolated-world 感知并 patch/restore）
- *   - useStorage(CAPTURE_FILTER) 抓取过滤配置，配合 FilterConfig 面板草稿编辑（Cancel/确定）
- *   - useStorage(MAX_BODY_SIZE / MAX_REQUESTS)  容量限制，配合 LimitsConfig 面板（失焦/回车提交）
- *   - StatusBadge                运行状态 + 已捕获计数（含条数上限）
- *   - 计数轮询                   每 2s 发 GET_REQUEST_COUNT 向 background 查询缓冲长度
- *   - Clear 按钮                 广播 CLEAR_REQUESTS 清空 background 缓冲与所有面板
- *   - Decrypt 设置区             AUTO_DECRYPT 开关与 DECRYPT_URL 解密服务地址
+ *   - 头部品牌区             标题 + 副标题（说明用途）
+ *   - 开关卡片               Enable Monitoring + 状态说明，开关右对齐（避免窄宽度下折行）
+ *   - 次级操作行             Filters / Limits 面板切换，非默认配置时显示圆点提示
+ *   - FilterConfig 面板      抓取过滤，草稿编辑 + Apply/Cancel
+ *   - LimitsConfig 面板      容量上限（body 体积 / 保留条数）
+ *   - StatusBadge            运行状态、已捕获计数与缓冲占用进度
+ *   - Clear 按钮             广播 CLEAR_REQUESTS 清空 background 缓冲与所有面板
+ *   - Decrypt 设置区         AUTO_DECRYPT 开关与 DECRYPT_URL 解密服务地址
  *
  * 协作：
  *   - 配置写入 chrome.storage.sync → isolated-world onChanged → 下发 main-world 即时生效
@@ -77,159 +78,115 @@ export default function App() {
 
   if (loading || filterLoading) {
     return (
-      <div style={{ width: '280px', padding: '16px', fontFamily: 'system-ui, sans-serif' }}>
-        <p style={{ color: '#999', fontSize: '14px' }}>Loading...</p>
+      <div className="popup">
+        <p className="loading">Loading…</p>
       </div>
     );
   }
 
   return (
-    <div style={{ width: '280px', padding: '16px', fontFamily: 'system-ui, sans-serif' }}>
-      <h2 style={{ margin: '0 0 16px', fontSize: '16px', color: '#333' }}>
-        Request Monitor
-      </h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <ToggleSwitch enabled={enabled} onChange={setEnabled} />
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              style={{
-                padding: '4px 8px',
-                border: `1px solid ${hasActiveFilters ? '#4CAF50' : '#ddd'}`,
-                borderRadius: '4px',
-                background: showFilters ? '#e3f2fd' : '#fff',
-                color: hasActiveFilters ? '#2E7D32' : '#666',
-                fontSize: '11px',
-                cursor: 'pointer',
-              }}
-            >
-              Filters {hasActiveFilters ? '●' : ''}
-            </button>
-            <button
-              onClick={() => setShowLimits(!showLimits)}
-              style={{
-                padding: '4px 8px',
-                border: `1px solid ${hasCustomLimits ? '#4CAF50' : '#ddd'}`,
-                borderRadius: '4px',
-                background: showLimits ? '#e3f2fd' : '#fff',
-                color: hasCustomLimits ? '#2E7D32' : '#666',
-                fontSize: '11px',
-                cursor: 'pointer',
-              }}
-            >
-              Limits {hasCustomLimits ? '●' : ''}
-            </button>
+    <div className="popup">
+      <header className="popup-header">
+        <div className="brand">
+          <span className="brand-mark">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 12h4l3 8 4-16 3 8h4" />
+            </svg>
+          </span>
+          <div>
+            <div className="brand-title">Request Monitor</div>
+            <div className="brand-sub">fetch &amp; XHR capture</div>
           </div>
         </div>
+      </header>
+
+      <div className="popup-body">
+        <section className="card switch-card">
+          <div>
+            <div className="card-title">Enable Monitoring</div>
+            <div className="card-hint">
+              {enabled ? 'Capturing requests on all tabs' : 'Monitoring is paused'}
+            </div>
+          </div>
+          <ToggleSwitch enabled={enabled} onChange={setEnabled} label="Enable monitoring" />
+        </section>
+
+        <div className="actions">
+          <button
+            type="button"
+            className={showFilters ? 'ghost-btn is-active' : 'ghost-btn'}
+            onClick={() => setShowFilters(!showFilters)}
+            aria-expanded={showFilters}
+          >
+            Filters
+            {hasActiveFilters && <span className="dot" title="Custom filter is active" />}
+          </button>
+          <button
+            type="button"
+            className={showLimits ? 'ghost-btn is-active' : 'ghost-btn'}
+            onClick={() => setShowLimits(!showLimits)}
+            aria-expanded={showLimits}
+          >
+            Limits
+            {hasCustomLimits && <span className="dot" title="Custom limits are active" />}
+          </button>
+        </div>
+
+        {showFilters && (
+          <>
+            <FilterConfig filter={draftFilter} onChange={setDraftFilter} />
+            <div className="btn-row">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => { setDraftFilter(filter); setShowFilters(false); }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-accent"
+                onClick={() => { setFilter(draftFilter); setShowFilters(false); }}
+              >
+                Apply
+              </button>
+            </div>
+          </>
+        )}
+
+        {showLimits && <LimitsConfig limits={limits} onChange={updateLimits} />}
+
         <StatusBadge enabled={enabled} count={count} max={limits.maxRequests} />
+
         <button
+          type="button"
+          className="danger-btn"
           onClick={() => {
             chrome.runtime.sendMessage({ type: MESSAGE_TYPES.CLEAR_REQUESTS });
             setCount(0);
           }}
           disabled={count === 0}
-          style={{
-            padding: '4px 8px',
-            border: `1px solid ${count > 0 ? '#e57373' : '#ddd'}`,
-            borderRadius: '4px',
-            background: count > 0 ? '#fff' : '#f5f5f5',
-            color: count > 0 ? '#d32f2f' : '#bbb',
-            fontSize: '11px',
-            cursor: count > 0 ? 'pointer' : 'not-allowed',
-          }}
         >
-          Clear
+          Clear captured requests
         </button>
-        {showFilters && (
-          <>
-            <FilterConfig filter={draftFilter} onChange={setDraftFilter} />
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => { setDraftFilter(filter); setShowFilters(false); }}
-                style={{
-                  padding: '6px 16px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  background: '#fff',
-                  color: '#666',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => { setFilter(draftFilter); setShowFilters(false); }}
-                style={{
-                  padding: '6px 16px',
-                  border: '1px solid #4CAF50',
-                  borderRadius: '4px',
-                  background: '#4CAF50',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                确定
-              </button>
-            </div>
-          </>
-        )}
-        {showLimits && (
-          <LimitsConfig limits={limits} onChange={updateLimits} />
-        )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid #eee', paddingTop: '8px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-            <span style={{ color: '#999', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Auto Decrypt
-            </span>
-            <div
-              onClick={() => setAutoDecrypt(!autoDecrypt)}
-              style={{
-                width: '36px',
-                height: '20px',
-                borderRadius: '10px',
-                background: autoDecrypt ? '#4CAF50' : '#ccc',
-                position: 'relative',
-                transition: 'background 0.2s',
-                cursor: 'pointer',
-              }}
-            >
-              <div
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  background: '#fff',
-                  position: 'absolute',
-                  top: '2px',
-                  left: autoDecrypt ? '18px' : '2px',
-                  transition: 'left 0.2s',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                }}
-              />
-            </div>
-          </label>
-          <label style={{ color: '#999', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Decrypt API URL
-          </label>
-          <input
-            type="text"
-            placeholder="http://localhost:3000/decrypt"
-            value={decryptUrl}
-            onChange={(e) => setDecryptUrl(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '5px 8px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '11px',
-              fontFamily: 'monospace',
-              boxSizing: 'border-box',
-            }}
-          />
+
+        <div className="section">
+          <div className="section-title">Decrypt service</div>
+          <div className="switch-row">
+            <span>Auto decrypt on open</span>
+            <ToggleSwitch enabled={autoDecrypt} onChange={setAutoDecrypt} size="sm" label="Auto decrypt" />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="decrypt-url">API URL</label>
+            <input
+              id="decrypt-url"
+              className="text-input"
+              type="text"
+              placeholder="http://localhost:3000/decrypt"
+              value={decryptUrl}
+              onChange={(e) => setDecryptUrl(e.target.value)}
+            />
+          </div>
         </div>
       </div>
     </div>

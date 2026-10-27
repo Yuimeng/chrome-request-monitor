@@ -107,90 +107,47 @@ export default function BodyTab({
 
   if (!content) {
     return (
-      <p style={{ padding: "12px", color: "#999", fontSize: "12px" }}>
+      <p className="placeholder">
         No {label.toLowerCase()} available
       </p>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div
-        style={{
-          padding: "8px 12px",
-          display: "flex",
-          gap: "6px",
-          alignItems: "center",
-        }}
-      >
-        <button
-          onClick={handleCopy}
-          style={{
-            padding: "3px 10px",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            background: copied ? "#e8f5e9" : "#fff",
-            color: copied ? "#2e7d32" : "#666",
-            fontSize: "11px",
-            cursor: "pointer",
-          }}
-        >
-          {copied ? "Copied!" : "Copy"}
+    <div className="body-pane">
+      <div className="body-toolbar">
+        <button type="button" className="btn btn-sm" onClick={handleCopy}>
+          {copied ? "Copied" : "Copy"}
         </button>
         {decryptUrl && !!decryptPayload && (
           <button
+            type="button"
+            className="btn btn-sm btn-warn"
             onClick={handleDecrypt}
             disabled={decrypting}
-            style={{
-              padding: "3px 10px",
-              border: "1px solid #ff9800",
-              borderRadius: "4px",
-              background: decrypting ? "#fff3e0" : "#fff8e1",
-              color: "#e65100",
-              fontSize: "11px",
-              cursor: decrypting ? "not-allowed" : "pointer",
-              fontWeight: 600,
-            }}
           >
-            {decrypting ? "Decrypting..." : "Decrypt"}
+            {decrypting ? "Decrypting…" : "Decrypt"}
           </button>
         )}
         {decryptUrl && !!decryptPayload && decrypted && (
           <button
+            type="button"
+            className="btn btn-sm"
             onClick={() => {
               setDecrypted(null);
               setDecryptError(null);
-            }}
-            style={{
-              padding: "3px 10px",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-              background: "#fff",
-              color: "#666",
-              fontSize: "11px",
-              cursor: "pointer",
             }}
           >
             Original
           </button>
         )}
-        {decryptError && (
-          <span style={{ color: "#d32f2f", fontSize: "11px" }}>
-            {decryptError}
-          </span>
-        )}
+        {decrypted && <span className="badge-decrypted">Decrypted</span>}
+        {decryptError && <span className="body-error">{decryptError}</span>}
       </div>
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflow: "hidden",
-          background: decrypted ? "#fffde7" : "#fafafa",
-        }}
-      >
+      <div className="body-code">
         <JsonEditor
           content={content}
-          background={decrypted ? "#fffde7" : "#fafafa"}
+          background={decrypted ? "#fffbeb" : "#fbfcfe"}
         />
       </div>
     </div>

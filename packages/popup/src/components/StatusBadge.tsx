@@ -1,43 +1,49 @@
 /**
- * 模块：popup / components / StatusBadge —— 运行状态徽标
+ * 模块：popup / components / StatusBadge —— 运行状态卡片
  *
- * 组成：绿点/灰点表示 Running/Stopped + 已捕获请求计数（含条数上限，如 128 / 500）。
- * 协作：App 传入 enabled、轮询得到的 count 与配置的 maxRequests，
- *   上限随 popup 的 Limits 配置变化，用于直观判断缓冲是否已接近淘汰阈值。
+ * 组成：
+ *   - 状态胶囊（Running / Stopped）  绿点表示正在抓取
+ *   - 计数（已捕获 / 条数上限）      上限来自 Limits 配置，直观展示淘汰阈值
+ *   - 占用进度条                    接近上限转橙、已满转红，提示即将开始淘汰旧记录
+ * 协作：App 传入 enabled、轮询得到的 count 与配置的 maxRequests。
  */
 interface StatusBadgeProps {
   enabled: boolean;
   count: number;
-  /** 最多保留的条数；未传时只显示计数 */
+  /** 最多保留的条数；未传时只显示计数、不显示进度条 */
   max?: number;
 }
 
 export default function StatusBadge({ enabled, count, max }: StatusBadgeProps) {
+  const ratio = max && max > 0 ? Math.min(1, count / max) : 0;
+  const meterClass = [
+    'meter-fill',
+    ratio >= 1 ? 'is-full' : ratio >= 0.8 ? 'is-near' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '4px',
-      padding: '8px 12px',
-      background: enabled ? '#E8F5E9' : '#F5F5F5',
-      borderRadius: '8px',
-      fontSize: '13px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          background: enabled ? '#4CAF50' : '#999',
-        }} />
-        <span style={{ color: enabled ? '#2E7D32' : '#666' }}>
+    <section className="card status-card">
+      <div className="status-line">
+        <span className={enabled ? 'status-pill is-running' : 'status-pill'}>
+          <span className="dot" />
           {enabled ? 'Running' : 'Stopped'}
         </span>
+        <span className="count">
+          <strong>{count}</strong>
+          {max ? (
+            <>
+              <span className="count-sep">/</span>
+              {max}
+            </>
+          ) : null}
+          {' requests'}
+        </span>
       </div>
-      <div style={{ color: '#666' }}>
-        Captured: <strong>{count}</strong>
-        {max !== undefined ? ` / ${max}` : ''} requests
-      </div>
-    </div>
+      {max ? (
+        <div className="meter" title={`Buffer usage ${Math.round(ratio * 100)}%`}>
+          <div className={meterClass} style={{ width: `${Math.round(ratio * 100)}%` }} />
+        </div>
+      ) : null}
+    </section>
   );
 }

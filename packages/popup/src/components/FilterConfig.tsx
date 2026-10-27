@@ -4,9 +4,9 @@
  * 组成：
  *   - URL Pattern 文本框（子串匹配，如 /api/）
  *   - fetch / XHR 两个捕获开关复选框
- *   - Methods 按钮组：空数组 = 不限方法；点击切换白名单（toggleMethod）
+ *   - Methods 标签组：空数组 = 不限方法；点击切换白名单（toggleMethod）
  *
- * 协作：受控组件，草稿在 App（draftFilter）中维护，点"确定"才写入 storage，
+ * 协作：受控组件，草稿在 App（draftFilter）中维护，点 Apply 才写入 storage，
  *   避免每敲一个字符就触发 main-world 重新匹配。
  */
 import type { CaptureFilter } from '@request-monitor/shared';
@@ -30,43 +30,27 @@ export default function FilterConfig({ filter, onChange }: FilterConfigProps) {
     update({ methods });
   };
 
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '10px',
-      padding: '10px 12px',
-      background: '#f9f9f9',
-      borderRadius: '8px',
-      fontSize: '13px',
-    }}>
-      <div style={{ fontWeight: 600, color: '#555', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        Filters
-      </div>
+  const allMethods = filter.methods.length === 0;
 
-      <div>
-        <label style={{ display: 'block', color: '#666', marginBottom: '4px', fontSize: '12px' }}>
-          URL Pattern
-        </label>
+  return (
+    <div className="panel">
+      <div className="panel-title">Capture filter</div>
+
+      <div className="field">
+        <label className="field-label" htmlFor="url-pattern">URL pattern</label>
         <input
+          id="url-pattern"
+          className="text-input"
           type="text"
           placeholder="e.g. /api/ or example.com"
           value={filter.urlPattern}
           onChange={(e) => update({ urlPattern: e.target.value })}
-          style={{
-            width: '100%',
-            padding: '5px 8px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            fontSize: '12px',
-            fontFamily: 'monospace',
-            boxSizing: 'border-box',
-          }}
         />
+        <div className="hint">Substring match against the full request URL.</div>
       </div>
 
-      <div style={{ display: 'flex', gap: '16px' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#555' }}>
+      <div className="check-row">
+        <label className="check">
           <input
             type="checkbox"
             checked={filter.captureFetch}
@@ -74,7 +58,7 @@ export default function FilterConfig({ filter, onChange }: FilterConfigProps) {
           />
           fetch
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#555' }}>
+        <label className="check">
           <input
             type="checkbox"
             checked={filter.captureXHR}
@@ -84,32 +68,23 @@ export default function FilterConfig({ filter, onChange }: FilterConfigProps) {
         </label>
       </div>
 
-      <div>
-        <label style={{ display: 'block', color: '#666', marginBottom: '4px', fontSize: '12px' }}>
-          Methods
-        </label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+      <div className="field">
+        <span className="field-label">Methods</span>
+        <div className="chip-row">
           {ALL_METHODS.map((method) => (
             <button
               key={method}
+              type="button"
+              className={allMethods || filter.methods.includes(method) ? 'chip is-on' : 'chip'}
+              aria-pressed={allMethods || filter.methods.includes(method)}
               onClick={() => toggleMethod(method)}
-              style={{
-                padding: '2px 8px',
-                border: `1px solid ${filter.methods.length === 0 || filter.methods.includes(method) ? '#4CAF50' : '#ddd'}`,
-                borderRadius: '4px',
-                background: filter.methods.length === 0 || filter.methods.includes(method) ? '#E8F5E9' : '#fff',
-                color: filter.methods.length === 0 || filter.methods.includes(method) ? '#2E7D32' : '#999',
-                fontSize: '11px',
-                cursor: 'pointer',
-                fontFamily: 'monospace',
-              }}
             >
               {method}
             </button>
           ))}
         </div>
-        <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
-          {filter.methods.length === 0 ? 'All methods selected (click to restrict)' : `Only: ${filter.methods.join(', ')}`}
+        <div className="hint">
+          {allMethods ? 'All methods captured · click to restrict' : `Only: ${filter.methods.join(', ')}`}
         </div>
       </div>
     </div>
