@@ -7,6 +7,7 @@
  *   - readOnlyTheme    通过 CSS 变量 --json-bg 跟随外层配色；行号槽用同一不透明底色，
  *                      横向滚动时内容从下方穿过也不会与行号文字重叠
  *   - EditorView       basicSetup + readOnly + editable(false) + json() 语法高亮
+ *   - Ctrl/Cmd+F       面板内拦截浏览器查找，改为打开 CodeMirror 搜索面板
  *
  * 协作：由 BodyTab 全权渲染请求体/响应体；content 变化时 dispatch 替换文档，
  *   不重建 EditorView（保留滚动位置），卸载时 destroy 避免 DOM 叠加泄漏。
@@ -15,6 +16,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import { basicSetup, EditorView } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { json } from "@codemirror/lang-json";
+import { openSearchPanel } from "@codemirror/search";
 
 function sortObjectKeys(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
@@ -72,6 +74,19 @@ const readOnlyTheme = EditorView.theme({
   ".cm-lineNumbers .cm-gutterElement": { padding: "0 8px 0 4px" },
   ".cm-activeLine": { backgroundColor: "transparent" },
   ".cm-activeLineGutter": { backgroundColor: "transparent" },
+  // 搜索命中：默认样式（半透明淡黄）在浅色底上几乎看不出来，这里改成实色 + 描边
+  ".cm-searchMatch": {
+    backgroundColor: "#ffe066",
+    outline: "1px solid #f0a500",
+    borderRadius: "2px",
+  },
+  // 当前命中的那一个：更深底色 + 更粗描边，与其余命中一眼可分
+  ".cm-searchMatch.cm-searchMatch-selected": {
+    backgroundColor: "#ff6b1a",
+    color: "#fff",
+    outline: "2px solid #c2410c",
+    borderRadius: "2px",
+  },
 });
 
 interface JsonEditorProps {
@@ -107,6 +122,26 @@ export const JsonEditor = ({ content, background = "#fafafa" }: JsonEditorProps)
       viewRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ctrl/Cmd+F：拦截浏览器查找，改为聚焦编辑器并打开 CodeMirror 搜索面板。
+  // 用 window capture 阶段监听，保证焦点不在编辑器（如刚切到 Body 页）时也能命中。
+  useEffect(() => {
+    const handleFindKey = (e: KeyboardEvent) => {
+      const isFind =
+        (e.ctrlKey || e.metaKey) &&
+        !e.altKey &&
+        !e.shiftKey &&
+        e.key.toLowerCase() === "f";
+      const view = viewRef.current;
+      if (!isFind || !view) return;
+      e.preventDefault();
+      e.stopPropagation();
+      view.focus();
+      openSearchPanel(view);
+    };
+    window.addEventListener("keydown", handleFindKey, true);
+    return () => window.removeEventListener("keydown", handleFindKey, true);
+  }, []);
 
   // 内容变化时原地替换文档
   useEffect(() => {
