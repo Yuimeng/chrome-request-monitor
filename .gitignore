@@ -4,3 +4,7 @@ dist/
 *.local
 .idea/
 .vscode/
+
+# 系统 / 工具生成
+.DS_Store
+.workbuddy-ai/
